@@ -1,5 +1,5 @@
 from scipy.io import loadmat        # Import scipy.io to load .mat files
-import numpy as np                  # Import numpy
+import numpy as np                  # Import numpy.
 
 dir_gtMaps = "NEMESIS_images/GroundTruthMaps/"
 dir_preProImages = "NEMESIS_images/preProcessedImages/"
