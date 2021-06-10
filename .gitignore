@@ -1,0 +1,5 @@
+NEMESIS_images/
+.vscode/
+__pycache__/
+scripts_guille/
+experiment_1.py
