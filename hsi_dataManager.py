@@ -248,12 +248,13 @@ class DatasetManager:
 
     # todo: Define method to batch a single image
 
-    def create_2d_batches(self):
+    def create_2d_batches_from_dataset(self):
         """
         Create a Python dictionary with small batches of size 'batch_size' from the loaded data and their labels. It follows the Random Stratified Sampling methodology.
         Not all batches will be perfectly distributed, since classes with fewer samples may not appear in all batches. Also, in case a batch is not going to comply with
         the input 'batch_size', we add more pixels from the class with more samples. The last batch would be the only one with fewer samples than 'batch_size'.
-        
+        Important: This method works when '_dataset.mat' files have been loaded! 
+
         Inputs
         ----------
         - 'batch_size': Integer. Represents the size of each batch.
@@ -264,8 +265,17 @@ class DatasetManager:
             - A) key = 'data'. Includes 'list_samples': Python list with sample of batches
             - B) key = 'label4Classes'. Includes 'list_labels': Python list with the labels of all batches in 'list_samples'
         """
+        #*################
+        #* ERROR CHECKER
+        #*
+        # Check if 'data' instance attribute contains samples. If not, it would mean that no '_dataset.mat' file has been loaded.
+        if ( len(self.data) == 0):
+            raise RuntimeError("No '_dataset.mat' file has been loaded. To use 'create_2d_batches_from_dataset()' method, please first load datasets using the 'load_patient_datasets()' method.")
+        #*    
+        #* END OF ERROR CHECKER ###
+        #*#########################
 
-        largest_label = self.__largest_class()                        # Find the label with more elements
+        largest_label = self.__largest_class()                      # Find the label with more elements
 
         data_temp = np.copy(self.data)                              # Create a copy of the loaded data in a temporary variable. This way, we don't delete data from the instance 'data' attribute.
         label4Classes_temp = np.copy(self.label4Classes)            # Create a copy of the loaded label4Classes in a temporary variable. This way, we don't delete data from the instance 'label4Classes' attribute.
@@ -276,7 +286,7 @@ class DatasetManager:
         #*###############################################
         #* WHILE LOOP CREATES 1 BATCH EVERY ITERATION
         #*
-        while data_temp.shape[0] >= self.batch_size:                     # Stay in this while loop if the number of samples left in 'dataTemp' is equal or greater than 'bath_size'
+        while data_temp.shape[0] >= self.batch_size:                # Stay in this while loop if the number of samples left in 'dataTemp' is equal or greater than 'bath_size'
 
             list_samples = []                                       # Create empty Python list to append data samples
             list_labels = []                                        # Create empty Python list to append data labels
