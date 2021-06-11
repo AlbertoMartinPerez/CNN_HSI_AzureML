@@ -24,6 +24,9 @@ dir_gtMaps = "NEMESIS_images/GroundTruthMaps/"
 dir_preProImages = "NEMESIS_images/preProcessedImages/"
 dir_rawImages = "NEMESIS_images/tif/"
 
+# Python dictionary to convert labels to label4Classes
+dic_label = {'101': 1, '200': 2, '220': 2, '221': 2, '301': 3, '302': 4, '320': 5, '331': 6}
+
 #*####################
 #* LOAD TRAIN IMAGES
 
