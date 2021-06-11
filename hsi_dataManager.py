@@ -24,31 +24,66 @@ class DatasetManager:
     #*#### DEFINED METHODS #####
     #*
 
-    def __init__(self):
+    def __init__(self, patch_size = 7, batch_size = 64):
         """
         Define the constructor of 'DatasetManager' class.
 
+        Inputs
+        ----------
+        - 'patch_size': Integer. Size of the 3D patches.
+        - 'batch_size': Integer. Size of each data batch.
+
         Attributes
         ----------
-        - 'patients_list': Python list. Attribute to store all patient IDs as a python list with strings
-        - 'data': Numpy array (but initialized as Python list). Attribute to store all dataset pixels once all patients have been loaded. All data will be appended
-        - 'label': Numpy array (but initialized as Python list). Attribute to store all dataset labels once all patients have been loaded. All labels will be appended
-        - 'label4Classes': Numpy array (but initialized as Python list): Attribute to store all dataset labels 4 classes once all patients have been loaded. All label4Classes will be appended
-        - 'numUniqueLabels': Integer. Attribute to store the total number of different labels once all patients have been loaded
-        - 'numTotalSamples': Integer. Attribute to store the total number of samples once all patients have been loaded
+        - Global attributes:
+            - 'patch_size': Integer corresponding the size of the 3D patches. Attibute used to calculate the padding to add to the hsi cubes.
+            - 'batch_size': Integer representing the size of each batch.
+        - Attributes related to '_dataset.mat' files:
+            - 'patients_dataset_list': Python list. Attribute to store all patient IDs as a python list with strings. Used when _datasets.mat files are loaded.
+            - 'data': Numpy array (but initialized as Python list). Attribute to store all dataset pixels once all patients have been loaded. All data will be appended.
+            - 'label': Numpy array (but initialized as Python list). Attribute to store all dataset labels once all patients have been loaded. All labels will be appended.
+            - 'label4Classes': Numpy array (but initialized as Python list): Attribute to store all dataset labels 4 classes once all patients have been loaded. All label4Classes will be appended.
+            - 'dataset_numUniqueLabels': Integer. Attribute to store the total number of different labels once all patients have been loaded.
+            - 'dataset_numTotalSamples': Integer. Attribute to store the total number of samples once all patients have been loaded.
+        - Attribute related to '_cropped_Pre-processed.mat' files (GT and preProcessedImages):
+            - 'patients_cubes_list': Python list. Attribute to store all patient IDs as a python list with strings. Used when _cropped_Pre-processed.mat files are loaded.
+            - 'patient_cubes': Python dictionary. Indeces are the patient IDs. Stores each patient 'preProcessedImage' (as cube) and 'groundTruthMap' (as gt). Dictionary keys are:
+                - 'pad_preProcessedImage': Padded Preprocessed cubes data for every patient. Used to create the patches.
+                - 'pad_groundTruthMap': Padded Ground truth maps for every patient. Used to create the patches.
+                - 'raw_preProcessedImage': Raw Preprocessed cubes data for every patient. Used to predict data.
+                - 'raw_groundTruthMap': Raw Ground truth maps for every patient. Used to predict data.
         """
+
+        #*################
+        #* ERROR CHECKER
+        #*
+        # Check if patch_size is an integer number
+        if not ( isinstance(patch_size, int) ):
+            raise TypeError("Expected integer (int) as input. Received input of type: ", str(type(patch_size)) )
+        # Check if batch_size is an integer number
+        if not ( isinstance(batch_size, int) ):
+            raise TypeError("Expected integer (int) as input. Received input of type: ", str(type(batch_size)) )
+        #*    
+        #* END OF ERROR CHECKER ###
+        #*#########################
 
         #* CREATE ATTRIBUTES FOR THE INSTANCES
         # Global attributes
-        self.patients_list = []
+        self.patch_size = patch_size
+        self.batch_size = batch_size
 
-        #* Attributes related to '_dataset.mat' files
+        #* Attributes related to '_dataset.mat' files 
+        self.patients_dataset_list = []
         self.data = []
         self.label = []
         self.label4Classes = []
 
-        self.numUniqueLabels = None
-        self.numTotalSamples = None
+        self.dataset_numUniqueLabels = None
+        self.dataset_numTotalSamples = None
+
+        #* Attribute related to '_cropped_Pre-processed.mat' files (GT and preProcessedImages)
+        self.patients_cubes_list = []
+        self.patient_cubes = {}
 
     def __largest_class(self):
         """
@@ -70,7 +105,7 @@ class DatasetManager:
         #*#########################
 
         # Create empty array with the same dimensions as the number of unique labels
-        temp_labels = np.zeros(self.numUniqueLabels, dtype=int)
+        temp_labels = np.zeros(self.dataset_numUniqueLabels, dtype=int)
 
         for label in np.unique(self.label4Classes)[0::]:                         # Iterate over all available labels
 
@@ -108,7 +143,7 @@ class DatasetManager:
         #* END OF ERROR CHECKER ###
         #*#########################
 
-        self.patients_list = patients_list              # Save in the 'self.patients_list' attribute all patient IDs as a python list with strings
+        self.patients_dataset_list = patients_list              # Save in the 'self.patients_dataset_list' attribute all patient IDs as a python list with strings
 
         # Load the first patient image to extract
         # Create temporary numpy array to store all samples with 1 row and as many columns as features in the first dataset patient
@@ -139,10 +174,72 @@ class DatasetManager:
         self.label = np.delete(temp_label_array, 0, axis = 0).astype(int)
         self.label4Classes = np.delete(temp_label4Classes_array, 0, axis = 0).astype(int)
 
-        self.numUniqueLabels = len(np.unique(self.label))       # Store in the 'self.numUniqueLabels' attribute a numpy array with the number of unique classes from all stored labels
-        self.numTotalSamples = self.data.shape[0]               # Store in the 'self.numTotalSamples' attribute the total number of loaded samples
+        self.dataset_numUniqueLabels = len(np.unique(self.label))       # Store in the 'self.dataset_numUniqueLabels' attribute a numpy array with the number of unique classes from all stored labels
+        self.dataset_numTotalSamples = self.data.shape[0]               # Store in the 'self.dataset_numTotalSamples' attribute the total number of loaded samples
 
-    # todo: Define method to load both preProcessedImages and ground truth maps // load_patient_cubes()
+    def load_patient_cubes(self, patients_list, dir_path_gt, dir_par_preProcessed):
+        """
+        Load all patient '.mat' ground truth maps and its corresponding preProcessedImage from the input list 'patients_list'.
+        It saves the data in 1 'DatasetManager' attributes
+        - 'patient_cubes': Python dictionary. Indeces are the patient IDs. Stores each patient 'preProcessedImage' (as cube) and 'groundTruthMap' (as gt). Dictionary keys are:
+                - 'pad_preProcessedImage': Padded Preprocessed cubes data for every patient. Used to create the patches.
+                - 'pad_groundTruthMap': Padded Ground truth maps for every patient. Used to create the patches.
+                - 'raw_preProcessedImage': Raw Preprocessed cubes data for every patient. Used to predict data.
+                - 'raw_groundTruthMap': Raw Ground truth maps for every patient. Used to predict data.
+        If more than 1 patient is given in the list, the data is appended to the dictionary, so that each index in the attribute corresponds to 1 single patient.
+        It also stores the python 'patients_list' as a 'DatasetManager' attribute, so that we know which patients have been used.
+        - Important: '_cropped_Pre-processed.mat' files need to have 'groundTruthMap' (ground-truth) and 'preProcessedImage' (preprocessed image) name fields.
+
+        Inputs
+        ----------
+        - 'patients_list':          Python list including the strings ID for each patient.
+        - 'dir_path_gt':            String that includes the path directory where the ground truth files are.
+        - 'dir_par_preProcessed':   String that includes the path directory where the preProcessed image files are.
+        """
+
+        #*################
+        #* ERROR CHECKER
+        #*
+        # Check if python list is empty
+        if (len(patients_list) == 0):
+            raise RuntimeError("Not expected an empty python list input. 'patients_list' is empty.")
+        # Check if first python list element is a string
+        if not ( isinstance(patients_list[0], str) ):
+            raise TypeError("Expected first element of 'patients_list' to be string. Received instead element of type: ", str(type(patients_list[0])) )
+        # Once the first element of the list is a string, check if all the elements in the 'patients_list' are also string
+        if (len(patients_list) != 1):
+            if ( all(element == patients_list[0] for element in patients_list) ):
+                raise TypeError("Expected 'patients_list' to only contain string elements. Please ensure all elements in the list are of type 'str' ")
+        #*    
+        #* END OF ERROR CHECKER ###
+        #*#########################
+
+        # Save in the 'self.patients_cubes_list' attribute all patient IDs as a python list with strings
+        self.patients_cubes_list = patients_list
+
+        # Calculate the pad dimension to add to each patient cube (usefull to create 3D patches)
+        pad_margin = int(np.ceil(self.patch_size/2))
+
+        #*############################################################
+        #* FOR LOOP ITERATES OVER ALL PATIENTS IN THE INPUT LIST.
+        #* IT ALSO APPENDS ALL GT MAPS AND PREPROCESSED IMAGES IN 
+        #* 'self.gtMap' AND 'self.preProcessedImage' ATTRIBUTES
+        #*
+        for patient in patients_list:
+
+            gt_mat = loadmat(dir_path_gt + 'SNAPgt' + patient + '_cropped_Pre-processed.mat')                           # Load ground truth map from the current patient
+            preProcessed_mat = loadmat(dir_par_preProcessed + 'SNAPimages' + patient + '_cropped_Pre-processed.mat')    # Load preProcessed image from the current patient
+
+            # Apply a constant padding to the GT to the height and width dimensions
+            gt = np.pad(gt_mat['groundTruthMap'], (pad_margin,), 'constant')
+            # Apply a constant padding to the preProcessed cube to the height and width dimensions (not the spectral channels)
+            cube = np.pad(preProcessed_mat['preProcessedImage'], [(pad_margin,pad_margin), (pad_margin,pad_margin), (0,0)], 'constant')
+
+            self.patient_cubes[patient] = {'pad_preProcessedImage': cube, 'pad_groundTruthMap': gt, 'raw_preProcessedImage': preProcessed_mat['preProcessedImage'], 'raw_groundTruthMap': gt_mat['groundTruthMap']}
+        #*
+        #* END FOR LOOP
+        #*##############
+
     # todo: Define method to create 3d batches from the cubes loaded using load_patient_cubes() // create_3d_batches()
 
     # todo: Define method to load raw images ('.tif') // load_patient_rawImages()
@@ -151,7 +248,7 @@ class DatasetManager:
 
     # todo: Define method to batch a single image
 
-    def create_2d_batches(self, batch_size):
+    def create_2d_batches(self):
         """
         Create a Python dictionary with small batches of size 'batch_size' from the loaded data and their labels. It follows the Random Stratified Sampling methodology.
         Not all batches will be perfectly distributed, since classes with fewer samples may not appear in all batches. Also, in case a batch is not going to comply with
@@ -168,16 +265,6 @@ class DatasetManager:
             - B) key = 'label4Classes'. Includes 'list_labels': Python list with the labels of all batches in 'list_samples'
         """
 
-        #*################
-        #* ERROR CHECKER
-        #*
-        # Check if batch_size is an integer number
-        if not ( isinstance(batch_size, int) ):
-            raise TypeError("Expected integer (int) as input. Received input of type: ", str(type(batch_size)) )
-        #*    
-        #* END OF ERROR CHECKER ###
-        #*#########################
-
         largest_label = self.__largest_class()                        # Find the label with more elements
 
         data_temp = np.copy(self.data)                              # Create a copy of the loaded data in a temporary variable. This way, we don't delete data from the instance 'data' attribute.
@@ -189,7 +276,7 @@ class DatasetManager:
         #*###############################################
         #* WHILE LOOP CREATES 1 BATCH EVERY ITERATION
         #*
-        while data_temp.shape[0] >= batch_size:                     # Stay in this while loop if the number of samples left in 'dataTemp' is equal or greater than 'bath_size'
+        while data_temp.shape[0] >= self.batch_size:                     # Stay in this while loop if the number of samples left in 'dataTemp' is equal or greater than 'bath_size'
 
             list_samples = []                                       # Create empty Python list to append data samples
             list_labels = []                                        # Create empty Python list to append data labels
@@ -216,7 +303,7 @@ class DatasetManager:
 
                     percentage =  (len(class_indices) / num_total_samples_left)     # Calculate percentage that correspond to the pixel 'labels' out of all samples left unused
 
-                    num_samples = int(round(batch_size * percentage))               # Calculate the number of samples to add to the batch for the current label
+                    num_samples = int(round(self.batch_size * percentage))          # Calculate the number of samples to add to the batch for the current label
 
                     if num_samples == 0: num_samples = 1
                     
@@ -224,10 +311,10 @@ class DatasetManager:
                     #* IF STATEMENT IS TO EVALUATE WHETHER OR NOT I NEED TO
                     #*  SUBSTRACT ANY SAMPLE BECAUSE THE BATCH HAS REACH ITS LIMIT
                     #*
-                    if ( (size_current_batch + num_samples) > batch_size ):
-                        samples_to_substract = ((size_current_batch + num_samples) - batch_size)    # Calculate the samples that need to be substracted
-                        num_samples -= samples_to_substract                                         # Update the 'num_samples' variable to comply with the 'batch_dimension' size
-                        class_indices = class_indices[0:-samples_to_substract]                      # Delete the latest samples that we are going to substract
+                    if ( (size_current_batch + num_samples) > self.batch_size ):
+                        samples_to_substract = ((size_current_batch + num_samples) - self.batch_size)   # Calculate the samples that need to be substracted
+                        num_samples -= samples_to_substract                                             # Update the 'num_samples' variable to comply with the 'batch_dimension' size
+                        class_indices = class_indices[0:-samples_to_substract]                          # Delete the latest samples that we are going to substract
                     #*
                     #* END OF IF
                     #*############
@@ -258,9 +345,9 @@ class DatasetManager:
             #* IN CASE ITS LENGHT IS LESS THAN THE ACTUAL BATCH_SIZE
             #* (We take samples from the label with more classes)
             #*
-            if (len(single_sample_batch) < batch_size):
+            if (len(single_sample_batch) < self.batch_size):
                 # Calculate the number of elements that we need to add to the batch. Will use the 'label' with more elements
-                samples_to_add = (batch_size - len(single_sample_batch))
+                samples_to_add = (self.batch_size - len(single_sample_batch))
 
                 # Extract the 'indices' where pixels are labeled as the 'largest label'. [0] is to extract the indices, since np.where() returns 2 arrays.
                 class_indices_temp = np.where(label4Classes_temp == largest_label)[0]
@@ -288,7 +375,7 @@ class DatasetManager:
         #*########################################################
         #* IF STATEMENT IS USED TO APPEND THE REMAINING DATA 
         #* THAT CAN NOT BE USED AS A BATCH OF 'batch_size' SIZE
-        if( (data_temp.shape[0] / batch_size) > 0):
+        if( (data_temp.shape[0] / self.batch_size) > 0):
             list_sample_batches.append(data_temp)
             list_label_batches.append(label4Classes_temp)
         #*   

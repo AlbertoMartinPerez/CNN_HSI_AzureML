@@ -24,18 +24,17 @@ dir_gtMaps = "NEMESIS_images/GroundTruthMaps/"
 dir_preProImages = "NEMESIS_images/preProcessedImages/"
 dir_rawImages = "NEMESIS_images/tif/"
 
-
 #*####################
 #* LOAD TRAIN IMAGES
 
 # Create an instance of 'DatasetManager'
-dm_train = hsi_dm.DatasetManager()
+dm_train = hsi_dm.DatasetManager(patch_size = 7, batch_size = 64)
 
 # Load all desired pixels to the 'DatasetManager' instance 'dm_train' (all data is stored inside the instance attributes)
 dm_train.load_patient_datasets(patients_list = patients_list_train, dir_path = dir_datasets)
 
 # Create batches with the loaded data. Returns 'batches' which is a Python dictionary including 2 Python lists, 'data' and 'labels', containing all batches
-batches_train = dm_train.create_2d_batches(batch_size = 64)
+batches_train = dm_train.create_2d_batches()
 
 """
 # PRINT IN TERMINAL THE SHAPE OF EVERY CREATED BATCH
@@ -54,7 +53,7 @@ labels_tensor_batch = dm_train.batch_to_tensor(batches_train['label4Classes'], d
 #* TRAIN NEURAL NETWORK
 
 # Create a FourLayerNet model, which contains 4 fully connected layers with relu activation functions
-model = models.FourLayerNet(D_in = dm_train.data.shape[-1], H = 16, D_out = dm_train.numUniqueLabels)
+model = models.FourLayerNet(D_in = dm_train.data.shape[-1], H = 16, D_out = dm_train.dataset_numUniqueLabels)
 
 # Train FourLayerNet model
 model.trainNet(batch_x = data_tensor_batch, batch_y = labels_tensor_batch, epochs = 10, plot = True, lr = 0.01)
@@ -64,13 +63,13 @@ model.trainNet(batch_x = data_tensor_batch, batch_y = labels_tensor_batch, epoch
 #* LOAD TEST IMAGES
 
 # Create an instance of 'DatasetManager'
-dm_test = hsi_dm.DatasetManager()
+dm_test = hsi_dm.DatasetManager(patch_size = 7, batch_size = 64)
 
 # Load all desired pixels to the 'DatasetManager' instance 'dm_test' (all data is stored inside the instance attributes)
 dm_test.load_patient_datasets(patients_list = ['ID0038C02'], dir_path = dir_datasets)
 
 # Create batches with the loaded data. Returns 'batches' which is a Python dictionary including 2 Python lists, 'data' and 'labels', containing all batches
-batches_test = dm_test.create_2d_batches(batch_size = 64)
+batches_test = dm_test.create_2d_batches()
 
 # Convert 'data' batches to PyTorch tensors for testing our Neural Network
 data_tensor_batch_test = dm_test.batch_to_tensor(batches_test['data'], data_type = torch.float)
@@ -80,14 +79,14 @@ data_tensor_batch_test = dm_test.batch_to_tensor(batches_test['data'], data_type
 #* PREDICT TEST IMAGES WITH OUT NEURAL NETWORK
 
 # Predict with the FourLayerNet model
-print("\nModel predicting patient image = ", str(dm_test.patients_list[0]))
+print("\nModel predicting patient image = ", str(dm_test.patients_dataset_list[0]))
 pred_labels = model.predict_2d(batch_x = data_tensor_batch_test)
 
 # Evaluate how well the model can predict a new image unused during training
 # batches['label4Classes']: is a Python list where each element contains the labels for each of the samples in the corresponding batch
 # by calling the 'batch_to_label_vector()' method, we generate a column numpy array from the Python list and store all batches labels in order
 # pred_labels: is a numpy column vector with all predicted labels of all batches in order
-metrics = mts.get_metrics(dm_test.batch_to_label_vector(batches_test['label4Classes']), pred_labels, dm_test.numUniqueLabels)
+metrics = mts.get_metrics(dm_test.batch_to_label_vector(batches_test['label4Classes']), pred_labels, dm_test.dataset_numUniqueLabels)
 
 print("\nMetrics after predicting:")
 print('\tOACC = ', str(metrics['OACC']))
