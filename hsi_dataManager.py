@@ -151,7 +151,7 @@ class DatasetManager:
         
         Outputs
         ----------
-        - Python dictionary with 2 Python lists:
+        - Python dictionary with 2 Python lists: (they are all in order, so index 0 of any key value would have information of the same sample)
             - A) key = 'data'. Includes 'list_samples': Python list with sample of batches
             - B) key = 'label4Classes'. Includes 'list_labels': Python list with the labels of all batches in 'list_samples'
         """
@@ -226,8 +226,8 @@ class DatasetManager:
                     list_samples.append(data_temp[class_indices[sample_indices]])                                    # Store in the Python list all randomly selected samples from the current label
                     list_labels.append(label4Classes_temp[class_indices[sample_indices]])                            # Store in the Python list all randomly selected sample labels from the current label
 
-                    data_temp = np.delete(data_temp, class_indices[sample_indices], axis = 0)                        # Remove the sampled pixels from the original 'data' variable
-                    label4Classes_temp = np.delete(label4Classes_temp, class_indices[sample_indices], axis = 0)      # Remove the sampled labels from the original 'data' variable   
+                    data_temp = np.delete(data_temp, class_indices[sample_indices], axis = 0)                        # Remove the sampled pixels from the temporary 'data' variable
+                    label4Classes_temp = np.delete(label4Classes_temp, class_indices[sample_indices], axis = 0)      # Remove the sampled labels from the temporary 'label4Classes' variable   
                 #*
                 #* END OF IF
                 #*############
@@ -259,7 +259,7 @@ class DatasetManager:
                 single_sample_batch = np.vstack([single_sample_batch, data_temp[class_indices_temp[sample_indices_temp]]])
                 single_label_batch = np.vstack([single_label_batch, label4Classes_temp[class_indices_temp[sample_indices_temp]]])
 
-                # Remove the additional sampled pixels and labels from the original 'data' variable
+                # Remove the additional sampled pixels and labels from the temporary 'data' and 'label4Classes variable
                 data_temp = np.delete(data_temp, class_indices_temp[sample_indices_temp], axis = 0)
                 label4Classes_temp = np.delete(label4Classes_temp, class_indices_temp[sample_indices_temp], axis = 0)
             #*   
@@ -363,6 +363,8 @@ class DatasetManager:
 #*#############################
 #*#### CubeManager class  #####
 #*
+
+# todo: Add error checker to warn user when loaded ground-truths have different number of total labels
 class CubeManager:
     """
     This class is used to load '_cropped_Pre-processed.mat' files destined to work with Neural Network models, both for training and classification.
@@ -397,11 +399,18 @@ class CubeManager:
                 - 'raw_preProcessedImage':  Raw Preprocessed cubes data for every patient. Used to predict data.
                 - 'raw_groundTruthMap':     Raw Ground truth maps for every patient. Used to predict data.
                 - 'label_coords':           Numpy array with the (x, y) coordenates and the label for every labeled pixel in the ground-truth map.
-            - 'data':            Numpy array (but initialized as Python list). Attribute to store all dataset pixels once all patient cubes have been loaded. All data will be appended.
-            - 'label':           Numpy array (but initialized as Python list). Attribute to store all dataset labels once all patient cubes have been loaded. All labels will be appended.
-            - 'label4Classes':   Numpy array (but initialized as Python list): Attribute to store all dataset labels 4 classes once all patient cubes have been loaded. All label4Classes will be appended.
-            - 'numUniqueLabels': Integer. Attribute to store the total number of different labels once all patients have been loaded.
-            - 'numTotalSamples': Integer. Attribute to store the total number of samples once all patients have been loaded.
+            - 'data':               Numpy array (but initialized as Python list). Attribute to store all dataset pixels once all patient cubes have been loaded. All data will be appended.
+            - 'label':              Numpy array (but initialized as Python list). Attribute to store all dataset labels once all patient cubes have been loaded. All labels will be appended.
+            - 'label4Classes':      Numpy array (but initialized as Python list): Attribute to store all dataset labels 4 classes once all patient cubes have been loaded. All label4Classes will be appended.
+            - 'label_coords':       Numpy array (but initialized as Python list): Attribute to store all coordenates for labeled pixels once all patient cubes have been loaded. All coordenates will be appended.
+                                    2D numpy array with 3 columns (x, y, patientNum), to properly identify to which patient the coordenates correspond.
+                                    'patientNum' is an integer index that help us identify the patient_id. When loading patients, the order of the IDs in the Python list will comply with this index.
+                                    Example: If patient ID35C02 is the first in the python list, then 'patientNum' would be 0. To ensure that, we can execute:
+                                        > input:    print(cm_train.patients_list[cm_train.label_coords[0, -1]])
+                                        > output:   ID35C02
+                                        Where 'cm_train' is a 'CubeManager' instance, 'patients_list' is one of its attributes as well as 'label_coords'. By using 'label_coords[0, -1]' we get the 'patientNum'.
+            - 'numUniqueLabels':    Integer. Attribute to store the total number of different labels once all patients have been loaded.
+            - 'numTotalSamples':    Integer. Attribute to store the total number of samples once all patients have been loaded. 
         """
 
         #*################
@@ -430,11 +439,12 @@ class CubeManager:
         self.data = []
         self.label = []
         self.label4Classes = []
+        self.label_coords = []
 
         self.numUniqueLabels = None
         self.numTotalSamples = None
     
-    def __get_gt_labels_coord(self, gt_map, preProcessedImage):
+    def __get_gt_labels_coord(self, gt_map, preProcessedImage, patientNum):
         """
         (Private method) Get the coordenates for each label in the passed ground truth map
         - Important: This method works if a call to or 'load_patient_cubes()' was made first.
@@ -442,7 +452,8 @@ class CubeManager:
         Inputs
         ----------
         - 'gt_map':             Numpy array with the ground truth map.
-        - 'preProcessedImage':  Numpy array with the preProcessedImage
+        - 'preProcessedImage':  Numpy array with the preProcessedImage.
+        - 'patientNum':         Integer to indicate the patient id of the input cube.
 
         Outputs
         ----------
@@ -467,7 +478,7 @@ class CubeManager:
             x, y = np.nonzero(gt_map == label)
 
             # Call private method to generate dataset from the passed cube
-            self.__get_dataset_from_cube(preProcessedImage, x, y, label)
+            self.__get_dataset_from_cube(preProcessedImage, x, y, label, patientNum)
 
             # Create and append a 2D numpy array with 3 columns:
 			#	- x: x coordenates for every 'label' pixel
@@ -481,7 +492,7 @@ class CubeManager:
 
         return labels_coord
  
-    def __get_dataset_from_cube(self, preProcessedImage, x, y, label):
+    def __get_dataset_from_cube(self, preProcessedImage, x, y, label, patientNum):
         """
         (Private method) Generate a dataset from the input cube (preProcessedImage).
         Append the dataset generated to the instance attributes 'self.data', 'self.cubes_label'
@@ -491,9 +502,14 @@ class CubeManager:
         Inputs
         ----------
         - 'preProcessedImage':  Numpy array with the preProcessed image.
-        - 'x':                  Numpy array with the X coordenates
-        - 'y':                  Numpy array with the Y coordenates          
+        - 'x':                  Numpy array with the X coordenates.
+        - 'y':                  Numpy array with the Y coordenates.   
+        - 'label':              Label value of all passed X and Y coordenates.
+        - 'patientNum':         Integer to indicate the patient id of the input coordenates.    
         """
+
+        # Append to 'self.label_coords' all coordenates from the preProcessedImage
+        self.label_coords.append( np.array([x, y, np.ones(x.shape)*patientNum]).transpose() )
 
         # Append to 'self.data' all pixels from the preProcessedImage corresponding to the input label
         self.data.append( preProcessedImage[x, y] )
@@ -524,8 +540,16 @@ class CubeManager:
     def load_patient_cubes(self, patients_list, dir_path_gt, dir_par_preProcessed):
         """
         Load all patient '.mat' ground truth maps and its corresponding preProcessedImage from the input list 'patients_list'.
-        It saves the data in 1 'DatasetManager' attributes
-        - 'patient_cubes': Python dictionary. Indeces are the patient IDs. Stores each patient 'preProcessedImage' (as cube) and 'groundTruthMap' (as gt). Dictionary keys are:
+        It saves the data in 8 'CubeManager' attributes:
+        - 'self.patients_list':     Saves the input python list to have it as reference in the instance.
+        - 'self.data':              Append all ground-truth pixels from all loaded patients by appending them.
+        - 'self.label':             Append all ground-truth labels from all loaded patients by appending them.
+        - 'self.label4Classes':     Append all ground-truth label4Classes from all loaded patients by appending them.
+        - 'self.label_coords':      Append all ground-truth coordenates from all loaded patients by appending them and indicate to which patient each sample corresponds to.
+                                    (2D Numpy array with 3 columns: x coordenate, y coordenate, patient number as an index to indicate the order of the loaded patients)
+        - 'self.numUniqueLabels':   Stores the number of unique classes from all stored labels.
+        - 'self.numTotalSamples':   Stores the number of total samples loaded.
+        - 'self.patient_cubes': Python dictionary. Indeces are the patient IDs. Stores each patient 'preProcessedImage' (as cube) and 'groundTruthMap' (as gt). Dictionary keys are:
                 - 'pad_preProcessedImage':  Padded Preprocessed cubes data for every patient. Used to create the patches.
                 - 'pad_groundTruthMap':     Padded Ground truth maps for every patient. Used to create the patches.
                 - 'raw_preProcessedImage':  Raw Preprocessed cubes data for every patient. Used to predict data.
@@ -533,7 +557,6 @@ class CubeManager:
                 - 'label_coords':           Numpy array with the (x, y) coordenates and the label for every labeled pixel in the ground-truth map.
         
         If more than 1 patient is given in the list, the data is appended to the dictionary, so that each index in the attribute corresponds to 1 single patient.
-        It also stores the python 'patients_list' as a 'DatasetManager' attribute, so that we know which patients have been used.
         - Important: '_cropped_Pre-processed.mat' files need to have 'groundTruthMap' (ground-truth) and 'preProcessedImage' (preprocessed image) name fields.
 
         Inputs
@@ -571,6 +594,8 @@ class CubeManager:
         #* IT ALSO APPENDS ALL GT MAPS AND PREPROCESSED IMAGES IN 
         #* 'self.gtMap' AND 'self.preProcessedImage' ATTRIBUTES
         #*
+        p = 0   # Variable to indicate with an index the loaded patient
+
         for patient in patients_list:
 
             gt_mat = loadmat(dir_path_gt + 'SNAPgt' + patient + '_cropped_Pre-processed.mat')                           # Load ground truth map from the current patient
@@ -579,7 +604,7 @@ class CubeManager:
             # Get coordenate labels for the current patient ground truth map.
             # Inside, it calls '__get_dataset_from_cube()' method to append data to the
             # instance attributes 'self.data', 'self.cubes_label' and 'self.cubes_label4Classes'.
-            labels_cords = self.__get_gt_labels_coord(gt_mat['groundTruthMap'], preProcessed_mat['preProcessedImage'])
+            labels_cords = self.__get_gt_labels_coord(gt_mat['groundTruthMap'], preProcessed_mat['preProcessedImage'], patientNum = p)
 
             # Apply a constant padding to the GT to the height and width dimensions
             gt = np.pad(gt_mat['groundTruthMap'], (pad_margin,), 'constant')
@@ -589,6 +614,8 @@ class CubeManager:
             self.patient_cubes[patient] = {'pad_preProcessedImage': cube, 'pad_groundTruthMap': gt,
                                          'raw_preProcessedImage': preProcessed_mat['preProcessedImage'],'raw_groundTruthMap': gt_mat['groundTruthMap'],
                                          'label_coords': labels_cords}
+            
+            p += 1  # Update patient number variable
         #*
         #* END FOR LOOP
         #*##############
@@ -597,14 +624,15 @@ class CubeManager:
         # and 'self.cubes_label4Classes'. At this point they are Python lists where each element
         # corresponds to a specific label and data for every patient loaded. (If 2 images with 5
         # classes were loaded, these attributes would have 10 elements.)
-        self.data = self.__concatenate_list_to_numpy(self.data)
-        self.label = self.__concatenate_list_to_numpy(self.label)
-        self.label4Classes = self.__concatenate_list_to_numpy(self.label4Classes).astype('int')
+        self.data = self.concatenate_list_to_numpy(self.data)
+        self.label = self.concatenate_list_to_numpy(self.label).astype('int')
+        self.label4Classes = self.concatenate_list_to_numpy(self.label4Classes).astype('int')
+        self.label_coords = self.concatenate_list_to_numpy(self.label_coords).astype('int')
 
         self.numUniqueLabels = len(np.unique(self.label))       # Store in the 'self.numUniqueLabels' attribute a numpy array with the number of unique classes from all stored labels
         self.numTotalSamples = self.data.shape[0]               # Store in the 'self.numTotalSamples' attribute the total number of loaded samples
 
-    def __concatenate_list_to_numpy(self, python_list):
+    def concatenate_list_to_numpy(self, python_list):
         """
         (Private method) Concatenate all elements in the input Python list to return a numpy array.
 
@@ -627,7 +655,6 @@ class CubeManager:
         # Return the numpy array with all elements and delete the first empty row
         return np.delete(temp_array, 0, axis = 0)
 
-    # todo: Adjust it to the CubeManager class attributes
     def __largest_class(self):
         """
         (Private method) Look for the labeled class with more elements from a numpy vector.
@@ -651,7 +678,6 @@ class CubeManager:
 
         return (np.where(temp_labels == np.amax(temp_labels))[0] + 1)   # Return the label containing the largest amount of elements (+1 since np.where returns the index starting at 0)
 
-    # todo: Adjust it to the CubeManager class attributes
     def create_2d_batches(self):
         """
         Create a Python dictionary with small batches of size 'batch_size' from the loaded cubes. It follows the Random Stratified Sampling methodology.
@@ -661,10 +687,11 @@ class CubeManager:
         
         Outputs
         ----------
-        - Python dictionary with 3 Python lists:
-            - A) key = 'data'. Includes 'list_samples': Python list with sample of batches
+        - Python dictionary with 3 Python lists: (they are all in order, so index 0 of any key value would have information of the same sample)
+            - A) key = 'data'.          Includes 'list_samples': Python list with sample of batches
             - B) key = 'label4Classes'. Includes 'list_labels': Python list with the labels of all batches in 'list_samples'
-            - C) key = 'label4Classes'. Includes 'list_labels': Python list with the labels of all batches in 'list_samples'
+            - C) key = 'label_coords'.  Includes 'list_coords': Python list with the label coordenates of all batches elements in 'list_coords'
+            - D) key = 'patientNums'.   Includes 'list_patientNum_batches': Python list with the patient identifier of all batches elements created
         """
         #*################
         #* ERROR CHECKER
@@ -680,9 +707,12 @@ class CubeManager:
 
         data_temp = np.copy(self.data)                              # Create a copy of the loaded data in a temporary variable. This way, we don't delete data from the instance 'data' attribute.
         label4Classes_temp = np.copy(self.label4Classes)            # Create a copy of the loaded label4Classes in a temporary variable. This way, we don't delete data from the instance 'label4Classes' attribute.
+        label_coords_temp = np.copy(self.label_coords)              # Create a copy of the loaded label_coords in a temporary variable. This way, we don't delete data from the instance 'label_coords' attribute.
 
         list_sample_batches = []
         list_label_batches = []
+        list_coords_batches = []
+        list_patientNum_batches = []
 
         #*###############################################
         #* WHILE LOOP CREATES 1 BATCH EVERY ITERATION
@@ -691,6 +721,9 @@ class CubeManager:
 
             list_samples = []                                       # Create empty Python list to append data samples
             list_labels = []                                        # Create empty Python list to append data labels
+            list_coords = []                                        # Create empty Python list to append label coordenates
+            list_patientNums = []                                   # Create empty Python list to append the patient number corresponding to each label
+
             size_current_batch = 0
 
             num_total_samples_left =  data_temp.shape[0]
@@ -730,15 +763,18 @@ class CubeManager:
                     #* END OF IF
                     #*############
 
-                    size_current_batch += num_samples                                                               # Update 'size_current_batch' variable to know the size of the current batch
+                    size_current_batch += num_samples                                                           # Update 'size_current_batch' variable to know the size of the current batch
 
-                    sample_indices = np.random.choice(len(class_indices), num_samples, replace=False)               # Randomly select a total of 'num_samples' sample indices for the batch
+                    sample_indices = np.random.choice(len(class_indices), num_samples, replace=False)           # Randomly select a total of 'num_samples' sample indices for the batch
 
-                    list_samples.append(data_temp[class_indices[sample_indices]])                                    # Store in the Python list all randomly selected samples from the current label
-                    list_labels.append(label4Classes_temp[class_indices[sample_indices]])                            # Store in the Python list all randomly selected sample labels from the current label
+                    list_samples.append(data_temp[class_indices[sample_indices]])                               # Store in the Python list all randomly selected samples from the current label
+                    list_labels.append(label4Classes_temp[class_indices[sample_indices]])                       # Store in the Python list all randomly selected sample labels from the current label
+                    list_coords.append(label_coords_temp[class_indices[sample_indices]][:, 0:-1])               # Store in the Python list all randomly selected sample label coordenates from the current label
+                    list_patientNums.append(label_coords_temp[class_indices[sample_indices]][:, -1])            # Store in the Python list the patient number of the randomly selected samples for the current label
 
-                    data_temp = np.delete(data_temp, class_indices[sample_indices], axis = 0)                        # Remove the sampled pixels from the original 'data' variable
-                    label4Classes_temp = np.delete(label4Classes_temp, class_indices[sample_indices], axis = 0)      # Remove the sampled labels from the original 'data' variable   
+                    data_temp = np.delete(data_temp, class_indices[sample_indices], axis = 0)                       # Remove the sampled pixels from the temporary 'data_temp' variable
+                    label4Classes_temp = np.delete(label4Classes_temp, class_indices[sample_indices], axis = 0)     # Remove the sampled labels from the temporary 'label4Classes_temp' variable
+                    label_coords_temp = np.delete(label_coords_temp, class_indices[sample_indices], axis = 0)       # Remove the sampled coordenates from the temporary 'label_coords' variable
                 #*
                 #* END OF IF
                 #*############
@@ -750,6 +786,11 @@ class CubeManager:
             # This way we concatenate all pixels from all labels to be stored in 1 single variable, which would represent 1 single batch
             single_sample_batch = np.concatenate(list_samples, axis=0)
             single_label_batch = np.concatenate(list_labels, axis=0)
+            single_coords_batch = np.concatenate(list_coords, axis=0)
+            single_patientNums_batch = np.concatenate(list_patientNums, axis=0)
+            # 'single_patientNums_batch' have shape (N,), but should be (N,1). That is why we do the reshape. Otherwise we would encounter errors when
+            # entering the next if statement (since when using np.vstack() at least 1 array should have (N,1) shape.)
+            single_patientNums_batch = single_patientNums_batch.reshape((len(single_patientNums_batch), 1))
 
             #*##################################################################
             #* IF STATEMENT IS TO ADD ADDITIONAL SAMPLES TO THE CURRENT BATCH 
@@ -769,16 +810,21 @@ class CubeManager:
                 # Store in the Python list all randomly selected samples and labels from the current label and the additional samples from the 'largest label' 
                 single_sample_batch = np.vstack([single_sample_batch, data_temp[class_indices_temp[sample_indices_temp]]])
                 single_label_batch = np.vstack([single_label_batch, label4Classes_temp[class_indices_temp[sample_indices_temp]]])
+                single_coords_batch = np.vstack([single_coords_batch, label_coords_temp[class_indices_temp[sample_indices_temp]][:, 0:-1]])
+                single_patientNums_batch = np.vstack([single_patientNums_batch, label_coords_temp[class_indices_temp[sample_indices_temp]][:, -1]])
 
-                # Remove the additional sampled pixels and labels from the original 'data' variable
+                # Remove the additional sampled pixels and labels from the temporary 'data','label4Classes' and 'label_coords_temp' variables
                 data_temp = np.delete(data_temp, class_indices_temp[sample_indices_temp], axis = 0)
                 label4Classes_temp = np.delete(label4Classes_temp, class_indices_temp[sample_indices_temp], axis = 0)
+                label_coords_temp = np.delete(label_coords_temp, class_indices_temp[sample_indices_temp], axis = 0)
             #*   
             #* END OF IF
             #*##############
 
             list_sample_batches.append(single_sample_batch)
             list_label_batches.append(single_label_batch)
+            list_coords_batches.append(single_coords_batch)
+            list_patientNum_batches.append(single_patientNums_batch)
         #*
         #* END OF WHILE 
         #*################
@@ -789,13 +835,21 @@ class CubeManager:
         if( (data_temp.shape[0] / self.batch_size) > 0):
             list_sample_batches.append(data_temp)
             list_label_batches.append(label4Classes_temp)
+            list_coords_batches.append(label_coords_temp[:, 0:-1])
+
+            # Since 'label_coords_temp[:, -1]' extracts a 1D numpy array, we have to reshape it into a 2D numpy array
+            # This way we append the array correctly.
+            label_coords_temp = label_coords_temp[:, -1].reshape((len(label_coords_temp[:, -1]), 1))
+            list_patientNum_batches.append(label_coords_temp)
+
         #*   
         #* END OF IF
         #*##############
 
-        return {'data':list_sample_batches, 'label4Classes':list_label_batches}
+        return {'data':list_sample_batches, 'label4Classes':list_label_batches, 'label_coords': list_coords_batches, 'patientNums': list_patientNum_batches}
    
-    # todo: Adjust it to the CubeManager class attributes
+    # todo: Adjust it to the CubeManager class attributes (include coordenates)
+    # ? Is it really necessary?
     def batch_to_tensor(self, python_list, data_type):
         """
         Convert all numpy array batches included in a Python list to desired PyTorch tensors types.
@@ -837,7 +891,8 @@ class CubeManager:
 
         return tensor_batch
 
-    # todo: Adjust it to the CubeManager class attributes
+    # todo: Adjust it to the CubeManager class attributes (include coordenates)
+    # ? Is it really necessary?
     def batch_to_label_vector(self, python_list):
         """
         Convert the input Python list including batches to a numpy column vector for evaluating metrics.
@@ -869,8 +924,10 @@ class CubeManager:
     # todo: Define method to create 3d batches from the cubes loaded using load_patient_cubes() // create_3d_batches()
 
     # todo: Define method to load raw images ('.tif') // load_patient_rawImages()
+    # ? Maybe create a new class?
 
     # todo: Define method to batch a single image
+    # ? Is it really necessary?
        
     #*
     #*#### END DEFINED METHODS #####
