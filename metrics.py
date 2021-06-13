@@ -128,96 +128,101 @@ def __class_metrics(confusion_mx):
 
 	return sensivity, specifity, accuracy, precission
 
-
-# TODO: Review this function before using it
-	# todo: I) Implement first 'load_patient_groundTruthMap()' method inside hsi_dataManager.py
-def get_prediction_map(true_labels, pred_labels, dims, title="", plot = True, save = False):
+def get_classification_map(pred_labels, true_labels, coordenates, dims, title= None, plot = True, save_plot = False, save_path = None, plot_gt = True):
 	"""
-	Generate a subplot with the original ground-truth and the predicted ground-truth.
+	Generates classification maps from the input labels.
+	It can generate:
+	- Single plot with the predicted classification map.
+	- A subplot with the original ground-truth and the predicted ground-truth.
 
     Inputs
     ----------
-    - 'true_labels':	Numpy array with original true labels
     - 'pred_labels':	Numpy array with predicted labels
+    - 'true_labels':	Numpy array with original true labels
+	- 'coordenates':	Numpy array with the coordenates of each labeled pixel of the ground truth map
     - 'dims':			Python list containing the dimensions of the classified ground truth map
     - 'title':			String to set the title of the subplot
-    - 'plot':			Boolean flag to indicate whether or not to plot the subplot
-    - 'save':			Boolean flag to indicate whether or not to save the subplot
+    - 'plot':			Boolean flag to indicate whether or not to show on screen the plot
+    - 'save_plot':		Boolean flag to indicate whether or not to save the plot
     - 'save_path':		String variable containing the path to save the subplot
-
+	- 'plot_gt':		Boolean flag to indicate whether or not
     """
 	#*################
     #* ERROR CHECKER
     #*
     # Check if 'true_labels' and 'pred_labels' are numpy arrays
-	if not isinstance(true_labels, np.ndarray):
-		raise TypeError("Expected numpy array as input. Received instead variable 'true_labels' of type: ", str(type(true_labels)) )
 	if not isinstance(pred_labels, np.ndarray):
 		raise TypeError("Expected numpy array as input. Received instead variable 'pred_labels' of type: ", str(type(pred_labels)) )
+	
+	# Enter this if statement if we want to plot the ground-truth as well
+	if(plot_gt):
+		if not isinstance(true_labels, np.ndarray):
+			raise TypeError("Expected numpy array as input. Received instead variable 'true_labels' of type: ", str(type(true_labels)) )
 
-	# Check if 'true_labels' and 'pred_labels' have the same shape
-	if not (true_labels.shape == pred_labels.shape):
-		raise RuntimeError("Expected 'labels' and 'pred_labels' to have the same shape. Received true_labels.shape = ", str(true_labels.shape), " and pred_labels.shape = ", str(pred_labels.shape))
+		# Check if 'true_labels' and 'pred_labels' have the same shape
+		if not (true_labels.shape == pred_labels.shape):
+			raise RuntimeError("Expected 'labels' and 'pred_labels' to have the same shape. Received true_labels.shape = ", str(true_labels.shape), " and pred_labels.shape = ", str(pred_labels.shape))
 
-	# Check if 'true_labels' and 'pred_labels' are numpy column vectors
-	if not (true_labels.shape[1] == 1 and pred_labels.shape[1] == 1):
-		raise RuntimeError("Expected 'true_labels' and 'pred_labels' to be column vectors of shape (N, 1). Received true_labels.shape = ", str(true_labels.shape), " and pred_labels.shape = ", str(pred_labels.shape))
+		# Check if 'true_labels' and 'pred_labels' are numpy column vectors
+		if not (true_labels.shape[1] == 1 and pred_labels.shape[1] == 1):
+			raise RuntimeError("Expected 'true_labels' and 'pred_labels' to be column vectors of shape (N, 1). Received true_labels.shape = ", str(true_labels.shape), " and pred_labels.shape = ", str(pred_labels.shape))
     #*    
     #* END OF ERROR CHECKER ###
     #*#########################
 
-	gt_raw_map = np.zeros((dims[0], dims[1]))
+	# Extract X and Y coordenates independently. 
+	# Extracting 1 column results in a 1D array, therefore we need to reshape 
+	# to have a (N, 1) shape and index labels to each coordenate properly.
+	# Otherwise, we would encounter the following error:
+	#	ValueError: shape mismatch: value array of shape (N,1)  could not be broadcast to indexing result of shape (N,)
+	x = coordenates[:, 0].reshape((len(coordenates), 1))
+	y = coordenates[:, -1].reshape((len(coordenates), 1))
+
+    # Generate empty arrays with same dimensions as the ground truth map.
 	pred_raw_map = np.zeros((dims[0], dims[1]))
 
-	gt_raw_map[true_labels[:,0], true_labels[:,1]] = true_labels[:,2]
-	pred_raw_map[true_labels[:,0], true_labels[:,1]] = pred_labels
+	# Update the raw maps with the corresponding labels for every coordenate
+	pred_raw_map[x, y] = pred_labels
 
-	gt_color = convert2color(gt_raw_map)
+	# Convert the raw map with labels to color maps
 	preds_color =  convert2color(pred_raw_map)
 
-
-	# Plot the results
+	# Plot prediction map
 	if plot:
 		fig = plt.figure()
-		#fig.suptitle(title, fontsize=16)
-		fig.add_subplot(1, 2, 1)
+		plt.title(title)
 		plt.imshow(preds_color)
-		plt.title("Prediction")
-		plt.axis('off')
-		fig.add_subplot(1, 2, 2)
-		plt.imshow(gt_color)
-		plt.title("Ground truth")
 		plt.axis('off')
 		plt.show()
 
-	# Save the model
-	if save:
-		plt.savefig(title+'_map.png', bbox_inches='tight')
+	# Do the same with the ground truth labels in case we want to plot it
+	if(plot_gt):
+    	# Generate empty arrays with same dimensions as the ground truth map.
+		gt_raw_map = np.zeros((dims[0], dims[1]))
 
-# TODO: Review this function before using it
-def get_cube_prediction_map(preds, coords, dims, title="", plot=True, save=False):
+		# Update the raw maps with the corresponding labels for every coordenate
+		gt_raw_map[x, y] = true_labels
 
-	preds_raw_map = np.zeros((dims[0], dims[1]))
+		# Convert the raw map with labels to color maps
+		gt_color = convert2color(gt_raw_map)
 
-	#targets_raw_map[targets[:,0],targets[:,1]] = targets[:,2]
-	preds_raw_map[coords[:,0],coords[:,1]] = preds
+		# Plot the prediction map and the ground truth map
+		if plot:
+			fig = plt.figure()
+			fig.suptitle(title)
+			fig.add_subplot(1, 2, 1)
+			plt.imshow(preds_color)
+			plt.title("Prediction")
+			plt.axis('off')
+			fig.add_subplot(1, 2, 2)
+			plt.imshow(gt_color)
+			plt.title("Ground truth")
+			plt.axis('off')
+			plt.show()
 
-	#targets_color = convert2color(targets_raw_map)
-	preds_color =  convert2color(preds_raw_map)
-
-
-	# Plot the results
-	fig = plt.figure()
-	#fig.suptitle(title, fontsize=16)
-	plt.imshow(preds_color)
-	plt.axis('off')
-
-
-	if plot:
-		plt.show()
-
-	if save:
-		plt.savefig(title+'_cube_map.png', bbox_inches='tight')
+	# Save the image
+	if save_plot:
+		plt.savefig(save_path + title + '_map.png', bbox_inches='tight')
 
 # TODO: Review this function before using it
 def paletteGen():
@@ -238,9 +243,9 @@ def paletteGen():
 # TODO: Review this function before using it
 def convert2color(gt_raw, palette=paletteGen()):
 	
-
-	# zeros MxNx3
+	# Create empty array to create an RGB imagen with MxMx3 dimensions
 	gt_color = np.zeros((gt_raw.shape[0], gt_raw.shape[1], 3), dtype=np.uint8)
+
 
 	for c, i in palette.items():
 		# get mask of vals that gt == #item in palette
