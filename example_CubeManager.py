@@ -80,7 +80,13 @@ elif ( batch_dim == '3D' ):
     data_tensor_batch = cm_train.batch_to_tensor(batches_train['cube'], data_type = torch.float)
     labels_tensor_batch = cm_train.batch_to_tensor(batches_train['label'], data_type = torch.LongTensor)
 
+    print('### DEBUG ###')
+    print('data_tensor_batch[0].shape = ', data_tensor_batch[0].shape)
+    stop
+
+
 print("\tTensors have been created.")
+
 
 
 #*######################
@@ -93,7 +99,7 @@ if ( batch_dim == '2D' ):
     model = models.FourLayerNet(D_in = cm_train.data.shape[-1], H = 16, D_out = cm_train.numUniqueLabels)
 
     # Train FourLayerNet model
-    model.trainNet(batch_x = data_tensor_batch, batch_y = labels_tensor_batch, epochs = 100, plot = True, lr = 0.01)
+    model.trainNet(batch_x = data_tensor_batch, batch_y = labels_tensor_batch, epochs = 10, plot = True, lr = 0.01)
 
 elif ( batch_dim == '3D' ):
     print('First train your 3D CNN! :)')
@@ -129,12 +135,13 @@ print("\tTensors have been created.")
 
 #*##############################################
 #* PREDICT TEST IMAGES WITH OUT NEURAL NETWORK
-
+print("\n##########")
+print("Predict loaded test images with trained model.")
 print("\nModel predicting patient image = ", cm_test.patients_list[0] )
 
 if ( batch_dim == '2D' ):
     # Predict with the FourLayerNet model
-    pred_labels = model.predict_2d(batch_x = data_tensor_batch_test)
+    pred_labels = model.predict(batch_x = data_tensor_batch_test)
 if ( batch_dim == '3D' ):
     print('First train your 3D CNN! :)')
     stop

@@ -91,7 +91,7 @@ data_tensor_batch_test = dm_test.batch_to_tensor(batches_test['data'], data_type
 
 # Predict with the FourLayerNet model
 print("\nModel predicting patient image = ", str(dm_test.patients_list[0]))
-pred_labels = model.predict_2d(batch_x = data_tensor_batch_test)
+pred_labels = model.predict(batch_x = data_tensor_batch_test)
 
 # Evaluate how well the model can predict a new image unused during training
 # batches['label4Classes']: is a Python list where each element contains the labels for each of the samples in the corresponding batch
