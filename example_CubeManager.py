@@ -39,62 +39,105 @@ dir_rawImages = "NEMESIS_images/tif/"
 # Python dictionary to convert labels to label4Classes
 dic_label = {'101': 1, '200': 2, '220': 2, '221': 2, '301': 3, '302': 4, '320': 5, '331': 6}
 
+# Determine dimension of batches for the Neural Network
+batch_dim = '2D'
+
 #*####################
 #* LOAD TRAIN IMAGES
+print("\n##########")
+print("Loading training images. Please wait...")
 
 # Create an instance of 'CubeManager'
-cm_train = hsi_dm.CubeManager(patch_size = 7, batch_size = 64, dic_label = dic_label)
+cm_train = hsi_dm.CubeManager(patch_size = 7, batch_size = 64, dic_label = dic_label, batch_dim = batch_dim)
 
 # Load all desired pixels to the 'CubeManager' instance 'cm_train' (all data is stored inside the instance attributes)
 cm_train.load_patient_cubes(patients_list_train, dir_gtMaps, dir_preProImages)
 
+print("\tTraining images have been loaded. Creating training batches...")
+
 # Create batches with the loaded data. Returns 'batches' which is a Python dictionary including 2 Python lists, 'data' and 'labels', containing all batches
-batches_train = cm_train.create_2d_batches()
+batches_train = cm_train.create_batches()
 
 """
 # PRINT IN TERMINAL THE SHAPE OF EVERY CREATED BATCH
 i = 0
-for b in batches_train['data']:
-    print('Size of batch ', str(i+1), ' = ', str(batches_train['data'][i].shape))
+for b in batches_train['cube']:
+    print('Size of batch ', i+1, ' = ', batches_train['cube'][i].shape )
     i += 1
+
+print('Last batch ', batches_train['cube'][i-1] )
 """
 
-# Convert 'data' and 'labels' batches to PyTorch tensors for training our Neural Network
-data_tensor_batch = cm_train.batch_to_tensor(batches_train['data'], data_type = torch.float)
-labels_tensor_batch = cm_train.batch_to_tensor(batches_train['label4Classes'], data_type = torch.LongTensor)
+print("\tTraining batches have been created. Converting data and label batches to tensors...")
+
+if ( batch_dim == '2D' ):
+    # Convert 'data' and 'label4Classes' batches to PyTorch tensors for training our Neural Network
+    data_tensor_batch = cm_train.batch_to_tensor(batches_train['data'], data_type = torch.float)
+    labels_tensor_batch = cm_train.batch_to_tensor(batches_train['label4Classes'], data_type = torch.LongTensor)
+
+elif ( batch_dim == '3D' ):
+    # Convert 'cube' and 'label' batches to PyTorch tensors for training our Neural Network
+    data_tensor_batch = cm_train.batch_to_tensor(batches_train['cube'], data_type = torch.float)
+    labels_tensor_batch = cm_train.batch_to_tensor(batches_train['label'], data_type = torch.LongTensor)
+
+print("\tTensors have been created.")
 
 
 #*######################
 #* TRAIN NEURAL NETWORK
+print("\n##########")
+print("Training your Neural Network. Please wait...")
 
-# Create a FourLayerNet model, which contains 4 fully connected layers with relu activation functions
-model = models.FourLayerNet(D_in = cm_train.data.shape[-1], H = 16, D_out = cm_train.numUniqueLabels)
+if ( batch_dim == '2D' ):
+    # Create a FourLayerNet model, which contains 4 fully connected layers with relu activation functions
+    model = models.FourLayerNet(D_in = cm_train.data.shape[-1], H = 16, D_out = cm_train.numUniqueLabels)
 
-# Train FourLayerNet model
-model.trainNet(batch_x = data_tensor_batch, batch_y = labels_tensor_batch, epochs = 100, plot = True, lr = 0.01)
+    # Train FourLayerNet model
+    model.trainNet(batch_x = data_tensor_batch, batch_y = labels_tensor_batch, epochs = 100, plot = True, lr = 0.01)
+
+elif ( batch_dim == '3D' ):
+    print('First train your 3D CNN! :)')
+    stop
 
 
 #*###################
 #* LOAD TEST IMAGES
+print("\n##########")
+print("Loading test image. Please wait...")
 
 # Create an instance of 'CubeManager'
-cm_test = hsi_dm.CubeManager(patch_size = 7, batch_size = 64, dic_label = dic_label)
+cm_test = hsi_dm.CubeManager(patch_size = 7, batch_size = 64, dic_label = dic_label, batch_dim = batch_dim)
 
 # Load all desired pixels to the 'CubeManager' instance 'cm_test' (all data is stored inside the instance attributes)
 cm_test.load_patient_cubes(patients_list = patient_test, dir_path_gt = dir_gtMaps, dir_par_preProcessed = dir_preProImages)
 
-# Create batches with the loaded data. Returns 'batches' which is a Python dictionary including 2 Python lists, 'data' and 'labels', containing all batches
-batches_test = cm_test.create_2d_batches()
+print("\tTest image has been loaded. Creating test batches...")
 
-# Convert 'data' batches to PyTorch tensors for testing our Neural Network
-data_tensor_batch_test = cm_test.batch_to_tensor(batches_test['data'], data_type = torch.float)
+# Create batches with the loaded data. Returns 'batches' which is a Python dictionary including 2 Python lists, 'data' and 'labels', containing all batches
+batches_test = cm_test.create_batches()
+
+print("\tTest batches have been created. Converting data batches to tensors...")
+
+if ( batch_dim == '2D' ):
+    # Convert 'data' batches to PyTorch tensors for training our Neural Network
+    data_tensor_batch_test = cm_test.batch_to_tensor(batches_test['data'], data_type = torch.float)
+elif ( batch_dim == '3D' ):
+    # Convert 'cube' batches to PyTorch tensors for training our Neural Network
+    data_tensor_batch_test = cm_test.batch_to_tensor(batches_test['cube'], data_type = torch.float)
+
+print("\tTensors have been created.")
 
 #*##############################################
 #* PREDICT TEST IMAGES WITH OUT NEURAL NETWORK
 
-# Predict with the FourLayerNet model
-print("\nModel predicting patient image = ", str(cm_test.patients_list[0]))
-pred_labels = model.predict_2d(batch_x = data_tensor_batch_test)
+print("\nModel predicting patient image = ", cm_test.patients_list[0] )
+
+if ( batch_dim == '2D' ):
+    # Predict with the FourLayerNet model
+    pred_labels = model.predict_2d(batch_x = data_tensor_batch_test)
+if ( batch_dim == '3D' ):
+    print('First train your 3D CNN! :)')
+    stop
 
 #*##############################################
 #* COMPUTE METRICS WITH THE MODEL PREDICTION
@@ -117,7 +160,7 @@ print('\tCONFUSION MATRIX: \n\t', str(metrics['CON_MAT']))
 #* COMPUTE CLASSIFICATION MAP
 
 print("\n##########")
-print("\Plotting classification maps")
+print("Plotting classification maps")
 
 # To compute classification maps, it is necessary to have used the 'CubeManager' class, since it
 # provides the X and Y coordenates for every pixel in every predicted batch.
@@ -127,10 +170,6 @@ print("\Plotting classification maps")
 true_labels = cm_test.concatenate_list_to_numpy(batches_test['label4Classes'])
 # Do the same with the coordenates to know the predicted label and its corresponding position
 label_coordenates = cm_test.concatenate_list_to_numpy(batches_test['label_coords']).astype(int)
-
-# Get count of True elements in a numpy array
-count = np.count_nonzero(np.in1d(cm_test.concatenate_list_to_numpy(batches_test['label4Classes']), pred_labels))
-print('Print count of True elements in array: ', count)
 
 # Extract dimension of the loaded groundTruthMap for the test patient
 dims = cm_test.patient_cubes[patient_test[0]]['raw_groundTruthMap'].shape
