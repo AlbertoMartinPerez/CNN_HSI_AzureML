@@ -75,9 +75,16 @@ class DatasetManager:
         # Create empty array with the same dimensions as the number of unique labels
         temp_labels = np.zeros(self.numUniqueLabels, dtype=int)
 
-        for label in np.unique(self.label4Classes)[0::]:                         # Iterate over all available labels
-
-            temp_labels[label-1] = np.count_nonzero(self.label4Classes == label)        # Number of pixels that are 'label'
+        #*#########################################################
+        #* FOR LOOP ITERATES OVER ALL AVAILABLE LABELS FROM THE
+        #* LOADED OR GENERATED DATASET.
+        #*
+        for label in np.unique(self.label4Classes)[0::]:
+            # Store the number of pixels that are 'label'
+            temp_labels[label-1] = np.count_nonzero(self.label4Classes == label)
+        #*
+        #* END FOR LOOP
+        #*##############
 
         return (np.where(temp_labels == np.amax(temp_labels))[0] + 1)   # Return the label containing the largest amount of elements (+1 since np.where returns the index starting at 0)
 
@@ -137,7 +144,11 @@ class DatasetManager:
             temp_label_array = np.vstack((temp_label_array, dataset['label']))                              # Concatenate all labels in 'label' from the current patient
             temp_label4Classes_array = np.vstack((temp_label4Classes_array, dataset['label4Classes']))      # Concatenate all labels in 'label' from the current patient
 
-            # Get rid of the first empty elements of the temporary arrays (remember they where created with the first row as empty)
+            #*############################################################
+            #* IF STATEMENT TO CHECK IF FIRST ROW OF THE TEMP ARRAY HAS
+            #* BEEN DELETED. (remember they where created with the first 
+            #* row as empty)
+            #*
             if not (deleted_row):
                 # Delete the first empty row
                 temp_data_array = np.delete(temp_data_array, 0, axis = 0)
@@ -145,6 +156,9 @@ class DatasetManager:
                 temp_label4Classes_array = np.delete(temp_label4Classes_array, 0, axis = 0)
                 # Update flag to True
                 deleted_row = True
+            #*
+            #* END OF IF
+            #*############
 
         #*
         #* END FOR LOOP
@@ -514,23 +528,32 @@ class CubeManager:
         # otherwise we would append always the empty row.
         deleted_row = False
 
-        # Iterate over all labels in the GroundTruth map excect the label 0, which is unlabeled data
-		# [1::] indicates the following thing:
-		#	> '1': start a the second element of the list
-		#	> ':': end at the last element
-		#	> ':': jump in invervals of 1
+        #*############################################################
+        #* FOR LOOP ITERATES OVER ALL PATIENTS IN THE INPUT LIST
+        #* EXCEPT THE LABEL 0, WHCIH IS UNLABELED DATA
+        #*
         for label in np.unique(gt_map)[1::]:
+            # [1::] indicates the following thing:
+            #	> '1': start a the second element of the list
+            #	> ':': end at the last element
+            #	> ':': jump in invervals of 1
 
             # Extract all the coordenates for the 'label' available in the Ground Truth.
             # np.nonzero() returns a tuple of arrays, one for each dimension of gt_map == label.
             x, y = np.nonzero(gt_map == label)
 
-            # Check if batches are '3D' and are going to use the padded ground-truth map.
-            # If so, sum the pad margin to the extracted coordenates. This way, we can ensure
-            # that we are using the correct coordenates for the padded ground-truth map
+            #*############################################################
+            #* IF STATEMENT TO CHECK IF BATCHES ARE '3D' AND NEED TO USE
+            #* THE PADDED GROUND-TRUTH MAP 
+            #*
             if (batch_dim == '3D'):
+                # If '3D' batches, sum the pad margin to the extracted coordenates. This way, we can ensure
+                # that we are using the correct coordenates for the padded ground-truth map
                 x = x + self.pad_margin
                 y = y + self.pad_margin
+            #*
+            #* END OF IF
+            #*############
 
             # Call private method to generate dataset from the passed cube
             self.__get_dataset_from_cube(preProcessedImage, x, y, label, patientNum)
@@ -542,12 +565,22 @@ class CubeManager:
             #                                     Note: labels are passed to label4Classes!
             labels_coord = np.vstack((labels_coord, np.array([x, y, np.ones(x.shape[0],) * label], dtype=int).transpose()))
 
-            # Get rid of the first empty elements of the temporary arrays (remember they where created with the first row as empty)
+            #*############################################################
+            #* IF STATEMENT TO CHECK IF FIRST ROW OF THE TEMP ARRAY HAS
+            #* BEEN DELETED. (remember they where created with the first 
+            #* row as empty)
+            #*
             if not (deleted_row):
                 # Delete the first empty row
                 labels_coord = np.delete(labels_coord, 0, axis = 0)
                 # Update flag to True
                 deleted_row = True
+            #*
+            #* END OF IF
+            #*############
+        #*
+        #* END FOR LOOP
+        #*##############
 
         return labels_coord
  
@@ -656,12 +689,18 @@ class CubeManager:
 
             gt_mat = loadmat(dir_path_gt + 'SNAPgt' + patient + '_cropped_Pre-processed.mat')                           # Load ground truth map from the current patient
             preProcessed_mat = loadmat(dir_par_preProcessed + 'SNAPimages' + patient + '_cropped_Pre-processed.mat')    # Load preProcessed image from the current patient
-
-            # If current ground truth map is wider than the maximum ground truth width, update 'self.max_gt_width'
+        
+            #*####################################################################
+            #* IF STATEMENT TO CHECK IF CURRENT GROUND-TRUTH MAP IS WIDER 
+            #* THAN THE MAXIMUM GROUND TRUTH WIDTH, AND UPDATE 'self.max_gt_width'
+            #*
             if(gt_mat['groundTruthMap'].shape[1] >= self.max_gt_width):
                 self.max_gt_width = gt_mat['groundTruthMap'].shape[1]
                 self.max_padded_width = self.max_gt_width + 2*self.pad_margin
-
+            #*
+            #* END OF IF
+            #*############
+            
             # Get coordenate labels for the current patient ground truth map.
             # Inside, it calls '__get_dataset_from_cube()' method to append data to the
             # instance attributes 'self.data', 'self.cubes_label' and 'self.cubes_label4Classes'.
@@ -699,7 +738,8 @@ class CubeManager:
     def __append_loaded_cubes(self):
         """
         (Private method) Reads all loaded ground-truth maps and preProcessedImages and saves 2 main numpy arrays as instance attributes:
-        'self.appended_cubes' and'self.appended_gtMaps'.
+        'self.appended_cubes' and'self.appended_gtMaps'. This method is called at the end of 'load_patient_cubes()' (when all data has been loaded).
+        These attributes include the padded ground-truth maps and preProcessedImages loaded in 'load_patient_cubes()' method.
         """
 
         # Calculate the number of bands length of the first loaded cube
@@ -713,33 +753,50 @@ class CubeManager:
         # otherwise we would append always the empty row.
         deleted_row = False
 
-        # Iterate over all loaded patients
+        #*############################################################
+        #* FOR LOOP ITERATES OVER ALL PATIENTS IN THE INPUT LIST.
+        #*
         for patient in self.patients_list:
 
             # Load the patient preProcessedImage and ground-truth map
             temp_preProcessedImage = self.patient_cubes[patient]['pad_preProcessedImage']
             temp_gt_map = self.patient_cubes[patient]['pad_groundTruthMap']
 
-            # If width shape of current patient ground-truth map is smaller than the maximum loaded ground-truth width,
-            # then calculate the padding to add (so that we can append all ground-truth maps with same width)
+            #*############################################################
+            #* IF STATEMENT TO CHECK IF CURRENT PATIENT GROUND-TRUTH MAP 
+            #* IS SMALLER THAN THE MAXIMUM LOADED GROUND-TRUTH WIDTH
+            #*
             if ( temp_gt_map.shape[-1] < self.max_padded_width):
-
+                # Calculate the padding to add (so that we can append all ground-truth maps with same width)
                 padding = self.max_padded_width - temp_gt_map.shape[-1]
                 # Add padding to the current ground-truth map and preProcessedImage to the right of the array
                 temp_preProcessedImage = np.pad(temp_preProcessedImage, [(0, 0), (0, padding), (0,0)], 'constant')
                 temp_gt_map = np.pad(temp_gt_map, [(0, 0), (0, padding)] , 'constant')
+            #*
+            #* END OF IF
+            #*############
 
             # Concatenate the current patient cube and ground-truth map
             padded_preProcessedImages = np.vstack((padded_preProcessedImages, temp_preProcessedImage))
             padded_gt_maps = np.vstack((padded_gt_maps, temp_gt_map))
 
-            # Get rid of the first empty elements of the temporary arrays (remember they where created with the first row as empty)
+            #*############################################################
+            #* IF STATEMENT TO CHECK IF FIRST ROW OF THE TEMP ARRAY HAS
+            #* BEEN DELETED. (remember they where created with the first 
+            #* row as empty)
+            #*
             if not (deleted_row):
                 # Delete the first empty row
                 padded_preProcessedImages = np.delete(padded_preProcessedImages, 0, axis = 0)
                 padded_gt_maps = np.delete(padded_gt_maps, 0, axis = 0)
                 # Update flag to True
                 deleted_row = True
+            #*
+            #* END OF IF
+            #*############
+        #*
+        #* END FOR LOOP
+        #*##############
 
         # Store appended padded ground-truth maps and preProcessedImages in the instance atributes
         self.appended_cubes = padded_preProcessedImages
@@ -758,8 +815,11 @@ class CubeManager:
         - Numpy array with all elements of the python list concatenated
         """
 
-        # Check shape of the elements in the input Python list. 
-        # Depending on its shape, we create empty temporary arrays with specified shapes.
+        #*##############################################################
+        #* IF ELSE STATEMENT TO CHECK SHAPE OF THE ELEMENTS IN THE INPUT
+        #* PYTHON LIST. GENERATE DIFFERENT TEMPORARY ARRAYS DEPENDING
+        #* ON THE INPUT BATCHES (2d with shape 2 and 3d with shape 4)
+        #*
         if ( len(python_list[0].shape) == 2 ):
             # If entered here, we are working with data with only rows and columns (samples x wavelenghts)
             # Some examples are: 'self.data', 'self.label4Classes', 'self.label' or 'self.labels_coords'
@@ -770,22 +830,38 @@ class CubeManager:
             # If entered here, we are working with data with ("patch_id" x "patch_size" x "patch_size" x "number of bands")
             # Create temporary array of 1 array of ("patch_size" x "patch_size" x "number of bands")
             temp_array = np.zeros_like(python_list[0])[0, :, :, :].reshape(1, python_list[0].shape[1], python_list[0].shape[2], python_list[0].shape[3])
+        #*
+        #* END OF IF ELSE
+        #*################
 
         # Flag to indicate that we have deleted the first row of the temporary array,
         # otherwise we would append always the empty row.
         deleted_row = False
 
-        # Iterate over every element in the Python list and stack them in temp_array
+        #*############################################################
+        #* FOR LOOP ITERATES OVER ALL ELEMENTS IN THE INPUT LIST
+        #* AND STACK THEM IN THE TEMPORARY ARRAY
+        #*
         for element in python_list:
             temp_array = np.vstack((temp_array, element))
 
-            # Get rid of the first empty elements of the temporary arrays (remember they where created with the first row as empty)
+            #*############################################################
+            #* IF STATEMENT TO CHECK IF FIRST ROW OF THE TEMP ARRAY HAS
+            #* BEEN DELETED. (remember they where created with the first 
+            #* row as empty)
+            #*
             if not (deleted_row):
                 # Delete the first empty row
                 temp_array = np.delete(temp_array, 0, axis = 0)
                 # Update flag to True
                 deleted_row = True       
-        
+            #*
+            #* END OF IF
+            #*############
+        #*
+        #* END FOR LOOP
+        #*##############
+
         # Return the numpy array with all elements and delete the first empty row
         return temp_array
 
@@ -807,9 +883,17 @@ class CubeManager:
         # Create empty array with the same dimensions as the number of unique labels
         temp_labels = np.zeros(self.numUniqueLabels, dtype=int)
 
-        # Evaluate whether or not we are creating '2D' or '3D' batches 
+        
+        #*#################################################
+        #* IF ELSE STATEMENT TO CHECK IF WE ARE CREATING 
+        #* '2D' OR '3D' BATCHES
+        #*
         if (self.batch_dim == '2D'):
 
+            #*############################################################
+            #* FOR LOOP ITERATES OVER ALL AVAILABLE LABELS FROM THE
+            #* LOADED OR GENERATED DATASET
+            #*
             # Iterate over all available labels
             for label in np.unique(self.label4Classes)[0::]:
 
@@ -818,21 +902,34 @@ class CubeManager:
             
                 # Return the label containing the largest amount of elements (+1 since np.where returns the index starting at 0)
                 return (np.where(temp_labels == np.amax(temp_labels))[0] + 1)
+            #*
+            #* END FOR LOOP
+            #*##############
         
         elif (self.batch_dim == '3D'):
 
-            # Iterate over all available labels except label 0
+            #*############################################################
+            #* FOR LOOP ITERATES OVER ALL AVAILABLE LABELS FROM THE
+            #* LOADED PREPROCESSED CUBES EXCEPT LABEL 0 (which is 
+            #* unlabeled data)
+            #*
             l = 0
             for label in np.unique(self.appended_gtMaps)[1::]:
                 # Number of pixels that are 'label'
                 temp_labels[l] = np.count_nonzero(self.appended_gtMaps == label)
 
                 l += 1
+            #*
+            #* END FOR LOOP
+            #*##############
 
             # Return the index label containing the largest amount of elements 
             label_index = (np.where(temp_labels == np.amax(temp_labels))[0])
 
             return np.unique(self.appended_gtMaps)[1::][label_index]
+        #*
+        #* END OF IF ELSE
+        #*################
 
     def create_batches(self):
         """
@@ -1220,13 +1317,19 @@ class CubeManager:
         xe = xs + self.patch_size
         ye = ys + self.patch_size
 
-		# Save inside the 'patches' variable each small 3D patch of size "patch_size" x "patch_size" x "number of bands"
-		# Use 'self.cube' attribute which contains the 'preProcessed' image. From the 'preProcessed' image extract small patches
-		# from the coordenates extracted.
+        #*############################################################
+        #* FOR LOOP ITERATES OVER ALL PASSED PIXEL COORDENATES TO 
+        #* GENERATE PATCHES FROM THE HSI CUBES AND SAVE THEM IN
+        #* THE 'patches' VARIABLE.
+        #*
         for i in range(len(x)):
-
+            # Save inside the 'patches' variable each small 3D patch of size "patch_size" x "patch_size" x "number of bands"
+		    # Use 'self.cube' attribute which contains the 'preProcessed' image. From the 'preProcessed' image extract small patches
+		    # from the coordenates extracted.
             patches[i,:,:,:] = self.appended_cubes[xs[i]:xe[i], ys[i]:ye[i], :]
-
+        #*
+        #* END FOR LOOP
+        #*##############
 
         return patches	
 
@@ -1266,8 +1369,8 @@ class CubeManager:
         for b in range(0, len(python_list), 1):
             tensor_batch.append( torch.from_numpy(python_list[b]).type(data_type) )
         #*    
-        #* END OF ERROR CHECKER ###
-        #*#########################
+        #* END FOR LOOP
+        #*###############
 
         return tensor_batch
 
