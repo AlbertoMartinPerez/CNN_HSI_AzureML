@@ -27,6 +27,7 @@ import metrics as mts               # Import 'metrics.py' file as 'mts' to evlua
 # ['ID0018C09', 'ID0025C02', 'ID0029C02', 'ID0030C02', 'ID0033C02', 'ID0034C02', 'ID0035C02', 'ID0038C02', 'ID0047C02', 'ID0047C08', 'ID0050C05', 'ID0051C05', 'ID0056C02', 'ID0064C04',
 # 'ID0064C06', 'ID0065C01', 'ID0065C09', 'ID0067C01', 'ID0068C08', 'ID0070C02', 'ID0070C05', 'ID0070C08', 'ID0071C02', 'ID0071C011', 'ID0071C014']
 patients_list_train = ['ID0018C09', 'ID0025C02']
+patient_list_test = ['ID0038C02']
 
 # Directories with data
 dir_datasets = "NEMESIS_images/datasets/"
@@ -44,7 +45,7 @@ dm_train = hsi_dm.DatasetManager(batch_size = 64)
 dm_train.load_patient_datasets(patients_list = patients_list_train, dir_path = dir_datasets)
 
 # Create batches with the loaded data. Returns 'batches' which is a Python dictionary including 2 Python lists, 'data' and 'labels', containing all batches
-batches_train = dm_train.create_2d_batches()
+batches_train = dm_train.create_batches()
 
 """
 # PRINT IN TERMINAL THE SHAPE OF EVERY CREATED BATCH
@@ -76,10 +77,10 @@ model.trainNet(batch_x = data_tensor_batch, batch_y = labels_tensor_batch, epoch
 dm_test = hsi_dm.DatasetManager(batch_size = 64)
 
 # Load all desired pixels to the 'DatasetManager' instance 'dm_test' (all data is stored inside the instance attributes)
-dm_test.load_patient_datasets(patients_list = ['ID0038C02'], dir_path = dir_datasets)
+dm_test.load_patient_datasets(patients_list = patient_list_test, dir_path = dir_datasets)
 
 # Create batches with the loaded data. Returns 'batches' which is a Python dictionary including 2 Python lists, 'data' and 'labels', containing all batches
-batches_test = dm_test.create_2d_batches()
+batches_test = dm_test.create_batches()
 
 # Convert 'data' batches to PyTorch tensors for testing our Neural Network
 data_tensor_batch_test = dm_test.batch_to_tensor(batches_test['data'], data_type = torch.float)
