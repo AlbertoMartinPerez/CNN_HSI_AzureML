@@ -96,8 +96,8 @@ def f_cube(image):
     #imCube = np.zeros(np.floor(image.shape[0] / 5), np.floor(image.shape[1] / 5), 25) #Declaras el cubo que vas a devolver
     imCube = np.zeros((image.shape[0] // 5, image.shape[1] // 5, 25)) #Declaras el cubo que vas a devolver
 
-    for x in range(0, image.shape[1] - 4): #Recorres columnas hasta el final - 3 (offset)
-        for y in range(0, image.shape[0] - 4): #Recorres filas hasta el final - 3 (offset)
+    for x in range(0, image.shape[1] - 3): #Recorres columnas hasta el final - 3 (offset)
+        for y in range(0, image.shape[0] - 3): #Recorres filas hasta el final - 3 (offset)
 
             imCube[(y//5), (x//5), np.mod(y,5)*5 + np.mod(x,5)] = image[y,x]
 
