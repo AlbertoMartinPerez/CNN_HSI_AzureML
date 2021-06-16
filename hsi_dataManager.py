@@ -1123,9 +1123,9 @@ class CubeManager:
 
     def __create_3D_batches(self):
         """
-        Create a Python dictionary with batches composed of small patches images (3D batches). It uses the information from the
-        obtained Python dictionary in '__create_2D_batches', such as the coordenates to extract the patches, the label to every
-        patch as well as the center coordenates of each batch taking into consideration the 'pad_margin'
+        Create a Python dictionary with batches composed of small patches images (3D batches). It access the
+        appended ground-truth maps and appended cubes attributes to generate 3D patches. These attributes
+        were created at the end of 'load_patient_cubes()', which calls '__append_loaded_cubes()'.
 
         Inputs
         ----------
@@ -1305,9 +1305,23 @@ class CubeManager:
         return {'cube': list_cube_batch, 'label': list_labels_batch}
 
     def __get_patches(self, x, y):
+        """
+        (Private method) Uses the input coordenates to extract patches from the appended ground-truth maps
+        and appended cubes. Patches are created with dimension (batch_size, num_features, height, width)
+        to comply with PyTorch convolutional layer requirements.
+        
+        Inputs
+        ----------
+        - 'x' and 'y':  Coordenates to access the 'appended_gtMaps' attribute and use them as center coordenates
+                        for the patches.
+
+        Outputs
+        ----------
+        - 'patches':    Numpy array with all generated patches from the centered coordenates passed as inputs.
+        """
     
-        # Create empty 'len(x)' arrays (or patches) with size: "patch_size" x "patch_size" x "number of bands"
-        patches = np.zeros((len(x), self.patch_size, self.patch_size, self.appended_cubes.shape[-1]))
+        # Create empty 'len(x)' arrays (or patches) with size: "number of bands" x "patch_size" x "patch_size" 
+        patches = np.zeros((len(x), self.appended_cubes.shape[-1], self.patch_size, self.patch_size))
 
 		# Extract start coordenates for 'x' and 'y' Python lists passed as parameter 
         xs = (x - int(self.patch_size/2)).astype(int)
@@ -1323,10 +1337,10 @@ class CubeManager:
         #* THE 'patches' VARIABLE.
         #*
         for i in range(len(x)):
-            # Save inside the 'patches' variable each small 3D patch of size "patch_size" x "patch_size" x "number of bands"
+            # Save inside the 'patches' variable each small 3D patch of size "number of bands" x "patch_size" x "patch_size"
 		    # Use 'self.cube' attribute which contains the 'preProcessed' image. From the 'preProcessed' image extract small patches
 		    # from the coordenates extracted.
-            patches[i,:,:,:] = self.appended_cubes[xs[i]:xe[i], ys[i]:ye[i], :]
+            patches[i,:,:,:] = np.transpose(self.appended_cubes[xs[i]:xe[i], ys[i]:ye[i], :], (2, 0, 1) )
         #*
         #* END FOR LOOP
         #*##############
