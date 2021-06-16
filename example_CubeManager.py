@@ -28,7 +28,7 @@ import numpy as np                  # Import Numpy as np
 # ['ID0018C09', 'ID0025C02', 'ID0029C02', 'ID0030C02', 'ID0033C02', 'ID0034C02', 'ID0035C02', 'ID0038C02', 'ID0047C02', 'ID0047C08', 'ID0050C05', 'ID0051C05', 'ID0056C02', 'ID0064C04',
 # 'ID0064C06', 'ID0065C01', 'ID0065C09', 'ID0067C01', 'ID0068C08', 'ID0070C02', 'ID0070C05', 'ID0070C08', 'ID0071C02', 'ID0071C011', 'ID0071C014']
 patients_list_train = ['ID0018C09', 'ID0025C02', 'ID0029C02']
-patient_test = ['ID0029C02']
+patient_test = ['ID0038C02']
 
 # Directories with data
 dir_datasets = "NEMESIS_images/datasets/"
@@ -40,7 +40,13 @@ dir_rawImages = "NEMESIS_images/tif/"
 dic_label = {'101': 1, '200': 2, '220': 2, '221': 2, '301': 3, '302': 4, '320': 5, '331': 6}
 
 # Determine dimension of batches for the Neural Network
-batch_dim = '2D'
+batch_dim = '3D'
+
+# Number of epochs
+epochs = 100
+
+# Batch size
+batch_size = 16
 
 #*####################
 #* LOAD TRAIN IMAGES
@@ -48,7 +54,7 @@ print("\n##########")
 print("Loading training images. Please wait...")
 
 # Create an instance of 'CubeManager'
-cm_train = hsi_dm.CubeManager(patch_size = 7, batch_size = 64, dic_label = dic_label, batch_dim = batch_dim)
+cm_train = hsi_dm.CubeManager(patch_size = 7, batch_size = batch_size, dic_label = dic_label, batch_dim = batch_dim)
 
 # Load all desired pixels to the 'CubeManager' instance 'cm_train' (all data is stored inside the instance attributes)
 cm_train.load_patient_cubes(patients_list_train, dir_gtMaps, dir_preProImages)
@@ -60,13 +66,35 @@ batches_train = cm_train.create_batches()
 
 """
 # PRINT IN TERMINAL THE SHAPE OF EVERY CREATED BATCH
-i = 0
-for b in batches_train['cube']:
-    print('Size of batch ', i+1, ' = ', batches_train['cube'][i].shape )
-    i += 1
+if ( batch_dim == '2D' ):
+    i = 0
+    for b in batches_train['data']:
+        print('Size of batch ', i+1, ' = ', batches_train['data'][i].shape )
+        i += 1
 
-print('Last batch ', batches_train['cube'][i-1] )
+    print('Last batch ', batches_train['data'][i-1] )
+
+elif ( batch_dim == '3D' ):
+    i = 0
+    for b in batches_train['cube']:
+        print('Size of batch ', i+1, ' = ', batches_train['cube'][i].shape )
+        i += 1
+
+    print('Last batch ', batches_train['cube'][i-1] )
+
+stop
 """
+print("\n\t#####")
+print('\t batches_train:')
+print("\t\t type(batches_train['cube']) = ", type(batches_train['cube']))
+print("\t\t len(batches_train['cube'] = ", len(batches_train['cube']))
+print("\t\t type(batches_train['cube'][0]) = ", type(batches_train['cube'][0]))
+print("\t\t batches_train['cube'][0].shape = ", batches_train['cube'][0].shape )
+print("\t\t batches_train['cube'][0][0].shape = ", batches_train['cube'][0][0].shape )
+
+train_folds, test_folds = hsi_dm.single_cross_validation(batches = batches_train['cube'], k_folds=5)
+
+stop
 
 print("\tTraining batches have been created. Converting data and label batches to tensors...")
 
@@ -99,7 +127,7 @@ if ( batch_dim == '2D' ):
     model = models.FourLayerNet(D_in = cm_train.data.shape[-1], H = 16, D_out = cm_train.numUniqueLabels)
 
     # Train FourLayerNet model
-    model.trainNet(batch_x = data_tensor_batch, batch_y = labels_tensor_batch, epochs = 10, plot = True, lr = 0.01)
+    model.trainNet(batch_x = data_tensor_batch, batch_y = labels_tensor_batch, epochs = epochs, plot = True, lr = 0.01)
 
 elif ( batch_dim == '3D' ):
     print('First train your 3D CNN! :)')
@@ -173,16 +201,20 @@ print("Plotting classification maps")
 # provides the X and Y coordenates for every pixel in every predicted batch.
 # Please note that 'DataManager' class does no provide the coordenates to any sample.
 
-# Concatenate all list elements from 'batches_test['label4Classes']' (all label batches) to a numpy array
-true_labels = cm_test.concatenate_list_to_numpy(batches_test['label4Classes'])
-# Do the same with the coordenates to know the predicted label and its corresponding position
-label_coordenates = cm_test.concatenate_list_to_numpy(batches_test['label_coords']).astype(int)
+if ( batch_dim == '2D' ):
+    # Concatenate all list elements from 'batches_test['label4Classes']' (all label batches) to a numpy array
+    true_labels = cm_test.concatenate_list_to_numpy(batches_test['label4Classes'])
+    # Do the same with the coordenates to know the predicted label and its corresponding position
+    label_coordenates = cm_test.concatenate_list_to_numpy(batches_test['label_coords']).astype(int)
 
-# Extract dimension of the loaded groundTruthMap for the test patient
-dims = cm_test.patient_cubes[patient_test[0]]['raw_groundTruthMap'].shape
+    # Extract dimension of the loaded groundTruthMap for the test patient
+    dims = cm_test.patient_cubes[patient_test[0]]['raw_groundTruthMap'].shape
 
-# Generate classification map from the predicted labels
-mts.get_classification_map(pred_labels, true_labels, label_coordenates, dims, title="Test classification Map", plot = True, save_plot = False, save_path = None, plot_gt = False)
+    # Generate classification map from the predicted labels
+    mts.get_classification_map(pred_labels, true_labels, label_coordenates, dims, title="Test classification Map", plot = True, save_plot = False, save_path = None, plot_gt = False)
+
+if ( batch_dim == '3D' ):
+    stop
 
 
 #*#### END MAIN PROGRAM #####

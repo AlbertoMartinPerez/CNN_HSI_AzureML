@@ -7,9 +7,10 @@
 # from around them to create patches. It can also use already made .mat datasets.
 #################################################################################
 
-import numpy as np                  # Import numpy
-import torch                        # Import PyTorch
-from scipy.io import loadmat        # Import scipy.io to load .mat files
+import numpy as np                          # Import numpy
+import torch                                # Import PyTorch
+from scipy.io import loadmat                # Import scipy.io to load .mat files
+from sklearn.model_selection import KFold   # Import KFold cross-validator from sklearn
 
 #*################################
 #*#### DatasetManager class  #####
@@ -177,7 +178,8 @@ class DatasetManager:
         """
         Create a Python dictionary with small batches of size 'batch_size' from the loaded data and their labels. It follows the Random Stratified Sampling methodology.
         Not all batches will be perfectly distributed, since classes with fewer samples may not appear in all batches. Also, in case a batch is not going to comply with
-        the input 'batch_size', we add more pixels from the class with more samples. The last batch would be the only one with fewer samples than 'batch_size'.
+        the input 'batch_size', we add more pixels from the class with more samples.
+        Note: If we have few samples left but they are not as big as 'batch_size', then we discard those pixels. (batches need to should be the same size for training)
         Important: This method works when '_dataset.mat' files have been loaded! Therefore, no coordenates are stored.
         
         Outputs
@@ -802,69 +804,6 @@ class CubeManager:
         self.appended_cubes = padded_preProcessedImages
         self.appended_gtMaps = padded_gt_maps.astype(int)
 
-    def concatenate_list_to_numpy(self, python_list):
-        """
-        (Private method) Concatenate all elements in the input Python list to return a numpy array.
-
-        Inputs
-        ----------
-        - 'python_list':    Python list to concatenate.
-        
-        Outputs
-        ----------
-        - Numpy array with all elements of the python list concatenated
-        """
-
-        #*##############################################################
-        #* IF ELSE STATEMENT TO CHECK SHAPE OF THE ELEMENTS IN THE INPUT
-        #* PYTHON LIST. GENERATE DIFFERENT TEMPORARY ARRAYS DEPENDING
-        #* ON THE INPUT BATCHES (2d with shape 2 and 3d with shape 4)
-        #*
-        if ( len(python_list[0].shape) == 2 ):
-            # If entered here, we are working with data with only rows and columns (samples x wavelenghts)
-            # Some examples are: 'self.data', 'self.label4Classes', 'self.label' or 'self.labels_coords'
-            # Create temporary array of 1 empty row with same columns as the elements in the python list
-            temp_array = np.zeros((1, python_list[0].shape[-1]))
-
-        elif ( len(python_list[0].shape) == 4 ):
-            # If entered here, we are working with data with ("patch_id" x "patch_size" x "patch_size" x "number of bands")
-            # Create temporary array of 1 array of ("patch_size" x "patch_size" x "number of bands")
-            temp_array = np.zeros_like(python_list[0])[0, :, :, :].reshape(1, python_list[0].shape[1], python_list[0].shape[2], python_list[0].shape[3])
-        #*
-        #* END OF IF ELSE
-        #*################
-
-        # Flag to indicate that we have deleted the first row of the temporary array,
-        # otherwise we would append always the empty row.
-        deleted_row = False
-
-        #*############################################################
-        #* FOR LOOP ITERATES OVER ALL ELEMENTS IN THE INPUT LIST
-        #* AND STACK THEM IN THE TEMPORARY ARRAY
-        #*
-        for element in python_list:
-            temp_array = np.vstack((temp_array, element))
-
-            #*############################################################
-            #* IF STATEMENT TO CHECK IF FIRST ROW OF THE TEMP ARRAY HAS
-            #* BEEN DELETED. (remember they where created with the first 
-            #* row as empty)
-            #*
-            if not (deleted_row):
-                # Delete the first empty row
-                temp_array = np.delete(temp_array, 0, axis = 0)
-                # Update flag to True
-                deleted_row = True       
-            #*
-            #* END OF IF
-            #*############
-        #*
-        #* END FOR LOOP
-        #*##############
-
-        # Return the numpy array with all elements and delete the first empty row
-        return temp_array
-
     def __largest_class(self):
         """
         (Private method) Look for the labeled class with more elements from a numpy vector.
@@ -954,7 +893,8 @@ class CubeManager:
         """
         Create a Python dictionary with small 2D batches of size 'batch_size' from the loaded cubes. It follows the Random Stratified Sampling methodology.
         Not all batches will be perfectly distributed, since classes with fewer samples may not appear in all batches. Also, in case a batch is not going to comply with
-        the input 'batch_size', we add more pixels from the class with more samples. The last batch would be the only one with fewer samples than 'batch_size'.
+        the input 'batch_size', we add more pixels from the class with more samples.
+        Note: If we have few samples left but they are not as big as 'batch_size', then we discard those pixels. (batches need to should be the same size for training)
         Important: This method works when '_cropped_Pre-processed.mat' files have been loaded! Therefore, we do store pixel coordenates!
 
         Outputs
@@ -1102,6 +1042,7 @@ class CubeManager:
         #* END OF WHILE 
         #*################
         
+        """
         #*########################################################
         #* IF STATEMENT IS USED TO APPEND THE REMAINING DATA 
         #* THAT CAN NOT BE USED AS A BATCH OF 'batch_size' SIZE
@@ -1118,6 +1059,7 @@ class CubeManager:
         #*   
         #* END OF IF
         #*##############
+        """
 
         return {'data':list_sample_batches, 'label4Classes':list_label_batches, 'label_coords': list_coords_batches, 'patientNums': list_patientNum_batches}
 
@@ -1126,6 +1068,8 @@ class CubeManager:
         Create a Python dictionary with batches composed of small patches images (3D batches). It access the
         appended ground-truth maps and appended cubes attributes to generate 3D patches. These attributes
         were created at the end of 'load_patient_cubes()', which calls '__append_loaded_cubes()'.
+        Note: If we have few samples left but they are not as big as 'batch_size', then we discard those pixels. (batches need to should be the same size for training)
+        Important: This method works when '_cropped_Pre-processed.mat' files have been loaded!
 
         Inputs
         ----------
@@ -1268,6 +1212,7 @@ class CubeManager:
         #* END OF WHILE 
         #*################
 
+        """
         #*########################################################
         #* IF STATEMENT IS USED TO APPEND THE REMAINING DATA 
         #* THAT CAN NOT BE USED AS A BATCH OF 'batch_size' SIZE
@@ -1301,6 +1246,7 @@ class CubeManager:
         #*   
         #* END OF IF
         #*##############
+        """
 
         return {'cube': list_cube_batch, 'label': list_labels_batch}
 
@@ -1341,11 +1287,75 @@ class CubeManager:
 		    # Use 'self.cube' attribute which contains the 'preProcessed' image. From the 'preProcessed' image extract small patches
 		    # from the coordenates extracted.
             patches[i,:,:,:] = np.transpose(self.appended_cubes[xs[i]:xe[i], ys[i]:ye[i], :], (2, 0, 1) )
+
         #*
         #* END FOR LOOP
         #*##############
 
         return patches	
+
+    def concatenate_list_to_numpy(self, python_list):
+        """
+        Concatenate all elements in the input Python list to return a numpy array.
+
+        Inputs
+        ----------
+        - 'python_list':    Python list to concatenate.
+            
+        Outputs
+        ----------
+        - Numpy array with all elements of the python list concatenated
+        """
+
+        #*##############################################################
+        #* IF ELSE STATEMENT TO CHECK SHAPE OF THE ELEMENTS IN THE INPUT
+        #* PYTHON LIST. GENERATE DIFFERENT TEMPORARY ARRAYS DEPENDING
+        #* ON THE INPUT BATCHES (2d with shape 2 and 3d with shape 4)
+        #*
+        if ( len(python_list[0].shape) == 2 ):
+            # If entered here, we are working with data with only rows and columns (samples x wavelenghts)
+            # Some examples are: 'self.data', 'self.label4Classes', 'self.label' or 'self.labels_coords'
+            # Create temporary array of 1 empty row with same columns as the elements in the python list
+            temp_array = np.zeros((1, python_list[0].shape[-1]))
+
+        elif ( len(python_list[0].shape) == 4 ):
+            # If entered here, we are working with data with ("patch_id" x "number of bands" x "patch_size" x "patch_size")
+            # Create temporary array of 1 array of ("patch_size" x "patch_size" x "number of bands")
+            temp_array = np.zeros_like(python_list[0])[0, :, :, :].reshape(1, python_list[0].shape[1], python_list[0].shape[2], python_list[0].shape[3])
+        #*
+        #* END OF IF ELSE
+        #*################
+
+        # Flag to indicate that we have deleted the first row of the temporary array,
+        # otherwise we would append always the empty row.
+        deleted_row = False
+
+        #*############################################################
+        #* FOR LOOP ITERATES OVER ALL ELEMENTS IN THE INPUT LIST
+        #* AND STACK THEM IN THE TEMPORARY ARRAY
+        #*
+        for element in python_list:
+            temp_array = np.vstack((temp_array, element))
+
+            #*############################################################
+            #* IF STATEMENT TO CHECK IF FIRST ROW OF THE TEMP ARRAY HAS
+            #* BEEN DELETED. (remember they where created with the first 
+            #* row as empty)
+            #*
+            if not (deleted_row):
+                # Delete the first empty row
+                temp_array = np.delete(temp_array, 0, axis = 0)
+                # Update flag to True
+                deleted_row = True       
+            #*
+            #* END OF IF
+            #*############
+        #*
+        #* END FOR LOOP
+        #*##############
+
+        # Return the numpy array with all elements and delete the first empty row
+        return temp_array
 
     def batch_to_tensor(self, python_list, data_type):
         """
@@ -1423,8 +1433,115 @@ class CubeManager:
 #*#### CubeManager class  #####
 #*#############################
 
+#*#########################################
+#*#### Single-cross validation method #####
+#*
 
-# todo: Define method to do a double-cross validation from input batches // double_cross_validation()
+# todo: (Optional) modify the method to work with 2D batches (AT THE MOMENT ONLY WORK WITH 3D BATCHES)
+def single_cross_validation(batches, k_folds = 5):
+    """
+    Perform single-cross validation using K-fold cross-validator from sklearn. Extracts test and training
+    indexes from the input Python list and then returns 2 Python list with the batches for every K-fold and Kn-fold.
+    - Important: At the moment the 'single_cross_validation()' can only be performed if the input Python lisst 'batches' contains
+    elements in 3D (if it includes patches).
+    
+    Inputs
+    ----------
+    - 'batch':      Python list. Used to know the lenght of it (the number of batches that includes).
+    - 'k_folds':    Integer. Indicates the number of folds for the K-fold cross-validator.  
+
+    Outputs
+    ----------
+    - 'train_folds':    Python list. Each element includes the numpy batches destined to train the models for every single K-fold split.
+    - 'test_folds':     Python list. Each element includes the numpy batches destined to test the best models for every single K-fold split.
+    """
+
+    # Create numpy array with same lenght as the number of batches included in the Python list
+    # This way we can extract the indices for the batches properly.
+    arr_1_loop = np.ones((len(batches), 1))
+
+    # Create empty lists to store the training and test batches for every fold split.
+    train_folds =  []
+    test_folds = []
+
+    # Convert 'batch' Python list to a numpy array
+    batch_array = reshape_list_to_numpy(batches)
+
+    # General KFold cross-validator using the passed number of 'k_folds'
+    # Shuffle = False: consecutive folds will be the shifted version of previous fold.
+    kf = KFold(n_splits = k_folds, shuffle = False)
+
+    #*#########################################################
+    #* FOR LOOP TO EXTRACT ALL INDEXES TO SPLIT THE BATCHES 
+    #* FOR TRAINING AND TEST. THIS INDEXES INDICATE WHICH 
+    #* BATCHES FROM THE INPUT BATCH LIST THAT ARE DESTINED TO
+    #* TRAIN AND TEST.
+    #* ----> FIRST CROSS-VALIDATION LOOP (K)
+    #*
+    for train_k, test_k in kf.split( range(len(arr_1_loop)) ):
+        # Each iteration corresponds to 1 single fold split.
+        # Append the batches using the indexes of the current fold split to the
+        # created Python lists.
+        train_folds.append( batch_array[train_k, :, :, :, :] )
+        test_folds.append( batch_array[test_k, :, :, :, :]  )
+        
+    #*
+    #* END FOR LOOP
+    #*###############
+
+    return train_folds, test_folds
+
+#*
+#*#### Single-cross validation method #####
+#*#########################################
+
+
+#*#######################################
+#*#### Reshape list to numpy method #####
+#*
+
+def reshape_list_to_numpy(python_list):
+    """
+    Create a 5D numpy array to append all 4D elements included in the input 'python_list'.
+    Used tin 'single_cross_validation()' method to properly extract which batches should be used for
+    training and which for testing on each K-fold.
+
+    Input
+    --------
+    - 'python_list': Python list. Each element should have shape '( num_patches, num_features, patch_height, patch_width ).
+
+    Output
+    --------
+    - 'batch_array_5d': Numpy array. Final shape is '( num_batches, num_patches, num_features, patch_heigh, patch_width )'
+
+    """
+
+    # Create empty array with shape '( num_batches, num_patches, num_features, patch_height, patch_width )'
+    # The idea is to work with a numpy array where dimensions correspond to '( num_batches, num_patches, num_features, height, width )'
+    batch_array_5d = np.zeros((len(python_list), python_list[0].shape[0], python_list[0].shape[1], python_list[0].shape[2], python_list[0].shape[3]))
+
+    #*############################################################
+    #* FOR LOOP ITERATES OVER ALL ELEMENTS IN THE INPUT LIST
+    #* AND STACK THEM IN THE TEMPORARY ARRAY
+    #*
+    i = 0
+    for element in python_list:
+
+        # Save inside the 'patches' variable each small 3D patch of size "number of bands" x "patch_size" x "patch_size"
+		# Use 'self.cube' attribute which contains the 'preProcessed' image. From the 'preProcessed' image extract small patches
+		# from the coordenates extracted.
+        batch_array_5d[i, :, :, :, :] = element
+        i += 1
+    
+    #*
+    #* END FOR LOOP
+    #*##############
+
+    return batch_array_5d
+
+#*
+#*#### Reshape list to numpy method #####
+#*#######################################
 
 # todo: Define method to load raw images ('.tif') // load_patient_rawImages()
 # ? Maybe create a new class?
