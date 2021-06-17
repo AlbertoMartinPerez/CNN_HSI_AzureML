@@ -48,6 +48,9 @@ epochs = 100
 # Batch size
 batch_size = 16
 
+# K_folds
+k_folds = 5
+
 #*####################
 #* LOAD TRAIN IMAGES
 print("\n##########")
@@ -84,6 +87,8 @@ elif ( batch_dim == '3D' ):
 
 stop
 """
+
+"""
 print("\n\t#####")
 print('\t batches_train:')
 print("\t\t type(batches_train['cube']) = ", type(batches_train['cube']))
@@ -91,10 +96,8 @@ print("\t\t len(batches_train['cube'] = ", len(batches_train['cube']))
 print("\t\t type(batches_train['cube'][0]) = ", type(batches_train['cube'][0]))
 print("\t\t batches_train['cube'][0].shape = ", batches_train['cube'][0].shape )
 print("\t\t batches_train['cube'][0][0].shape = ", batches_train['cube'][0][0].shape )
+"""
 
-train_folds, test_folds = hsi_dm.single_cross_validation(batches = batches_train['cube'], k_folds=5)
-
-stop
 
 print("\tTraining batches have been created. Converting data and label batches to tensors...")
 
@@ -108,14 +111,17 @@ elif ( batch_dim == '3D' ):
     data_tensor_batch = cm_train.batch_to_tensor(batches_train['cube'], data_type = torch.float)
     labels_tensor_batch = cm_train.batch_to_tensor(batches_train['label'], data_type = torch.LongTensor)
 
+"""    
     print('### DEBUG ###')
-    print('data_tensor_batch[0].shape = ', data_tensor_batch[0].shape)
-    stop
-
+    print('data_tensor_batch: ')
+    print('\t type(data_tensor_batch) = ', type(data_tensor_batch))
+    print('\t data_tensor_batch[0].shape = ', data_tensor_batch[0].shape)
+    print('\t type(labels_tensor_batch) = ', type(labels_tensor_batch))
+    print('\t labels_tensor_batch[0].shape = ', labels_tensor_batch[0].shape)
+ """   
+    
 
 print("\tTensors have been created.")
-
-
 
 #*######################
 #* TRAIN NEURAL NETWORK
@@ -130,9 +136,21 @@ if ( batch_dim == '2D' ):
     model.trainNet(batch_x = data_tensor_batch, batch_y = labels_tensor_batch, epochs = epochs, plot = True, lr = 0.01)
 
 elif ( batch_dim == '3D' ):
-    print('First train your 3D CNN! :)')
+    # Create a Conv2DNet model
+    model = models.Conv2DNet(num_classes = cm_train.numUniqueLabels, in_channels = cm_train.numBands)
+    print("\tConv2DNet model has been defined!")
+
+    print("\tSplitting data before performing K-fold double-cross validation...")
+    test_data_folds, test_label_folds, calibration_data_folds, calibration_label_folds, validation_data_folds, validation_label_folds  = hsi_dm.kfold_double_cv_split(batch_data=data_tensor_batch, batch_labels=labels_tensor_batch, k_folds=k_folds)
+
+    print("\tData has been splitted. Performing ", k_folds ,"fold double-cross validation...")
+
+    models.double_cross_validation(model=model, k_folds=k_folds)
+            
     stop
 
+    # Train Conv2DNet model
+    model.trainNet(batch_x = data_tensor_batch, batch_y = labels_tensor_batch, epochs = epochs, plot = True, lr = 0.01)
 
 #*###################
 #* LOAD TEST IMAGES
