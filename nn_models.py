@@ -12,8 +12,10 @@ import matplotlib.pyplot as plt     # Import matplotlib to create loss and accur
 import numpy as np                  # Import numpy
 
 
+# ? GPU FUNCTIONALITY HERE
 # Save in 'device' whether we use the CPU or the GPU via CUDA to train Neural Networks
-device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
+# device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
+# device = 'cpu'
 
 #*###############################
 #*#### FourLayerNet class  #####
@@ -99,8 +101,9 @@ class FourLayerNet(nn.Module):
         optimizer = torch.optim.Adam(self.parameters(), lr = lr)    # 'self' is the model itself. We are basically doing 'model.parameters()'
         criterion = torch.nn.CrossEntropyLoss()
 
+        # ? GPU FUNCTIONALITY HERE
         # Store the model inside the GPU memory
-        self.cuda()
+        # self.cuda()
 
         # Set the model to train mode to let know PyTorch that during backpropagation
         # it should not apply drop-out, batch norm or any layer with special behaviours
@@ -123,15 +126,17 @@ class FourLayerNet(nn.Module):
             #*
             for X, Y in zip(batch_x, batch_y):
 
+                # ? GPU FUNCTIONALITY HERE
                 # Transfer the current batch tensors to the GPU if available
-                X = X.to(device)
-                Y = Y.to(device)
+                # X = X.to(device)
+                # Y = Y.to(device)
 
                 # Forward pass. This will automatically call the 'forward(self, x)' method
                 y_pred = self(X)    # 'self' is the model itself. We are basically doing 'model(X)'
 
+                # ? GPU FUNCTIONALITY HERE
                 # Transfer the created tensor to the GPU
-                y_pred = y_pred.to(device)
+                # y_pred = y_pred.to(device)
 
                 # Compute loss.
                 # Loss function needs the predicted outputs from 'model()' and a row vector with the same number of elements as the number of entries (rows) in 'y_pred'
@@ -219,8 +224,9 @@ class FourLayerNet(nn.Module):
             #*
             for X in batch_x:
 
+                # ? GPU FUNCTIONALITY HERE
                 # Transfer the current batch tensor to the GPU if available
-                X = X.to(device)
+                # X = X.to(device)
                 
                 # For every single batch 'X', we calculate the label probabilities for every element.
                 # 'ps' is an array where each row represents the probabilities of each element to be one of the output classes returned by the model.
@@ -257,16 +263,13 @@ class Conv2DNet(nn.Module):
 
     Layers
     ----------
-    - self.linear1 = torch.nn.Linear(D_in, H)
-    - self.linear2 = torch.nn.Linear(H, H*2)
-    - self.linear3 = torch.nn.Linear(H*2, H*3)
-    - self.linear4 = torch.nn.Linear(H*3, D_out)
+
     """
 
     #*#######################################
     #*#### DEFINED Conv2DNet METHODS #####
     #*
-    def __init__(self, num_classes, in_channels, out_channels, kernel_size, stride = 1, padding = 0):
+    def __init__(self, num_classes, in_channels):
         """
         Constructor to define the Neural Network model elements. All classes have a function __init__(), which is always executed when the class
 	    is bein initiated. It is used to assign vlaues to objet properties or other operations
@@ -276,6 +279,9 @@ class Conv2DNet(nn.Module):
         ----------
         - 'num_classes':    (int) Number of unique labels to classify in the training data.
         - 'in_channels':    (int) Number of channels in the input image.
+
+        , out_channels, kernel_size, stride = 1, padding = 0)
+
         - 'out_channels':   (int) Number of channels produced by the convolution.
         - 'kernel_size':    (int or tuple) Size of the convolving kernel.
         - 'stride':         (int or tuple) Stride of the convolution.
@@ -287,11 +293,19 @@ class Conv2DNet(nn.Module):
         # todo: Properly define the CNN architecture
 
         #* DEFINE NETWORK LAYERS
-        # For 'Convolutional' layers, input shape should be the number of input features in the first layer
-        self.conv1 = torch.nn.Conv2d(in_channels, out_channels, kernel_size, stride, padding)
-        self.pool1 = torch.nn.MaxPool2d(kernel_size = 2, stride = 2, padding = 0)
-        self.fc2 = torch.nn.Linear(H*3, 64)
-        self.fc3 = torch.nn.Linear(64, num_classes)
+        self.conv = nn.Sequential(
+            ConvBlock_2D(in_channels=in_channels, out_channels=64),
+            ConvBlock_2D(in_channels=64, out_channels=128),
+            ConvBlock_2D(in_channels=128, out_channels=256),
+            ConvBlock_2D(in_channels=256, out_channels=512),
+        )
+
+        self.fc = nn.Sequential(
+            nn.Linear(4, 128),
+            nn.PReLU(),
+            nn.BatchNorm1d(128),
+            nn.Linear(128, num_classes),
+        )
 
     def forward(self, x):
         """
@@ -303,11 +317,8 @@ class Conv2DNet(nn.Module):
         ----------
         - x:    Input PyTorch tensor used to compute the forward pass
         """
-        x = F.relu(self.linear1(x))
-        x = F.relu(self.linear2(x))
-        x = F.relu(self.linear3(x))
-        x = self.linear4(x)
-
+        x = self.conv(x)
+        #x = self.fc(x)
         return x
 
     def trainNet(self, batch_x, batch_y, epochs = 500, plot = False, lr = 0.002):
@@ -334,8 +345,9 @@ class Conv2DNet(nn.Module):
         optimizer = torch.optim.Adam(self.parameters(), lr = lr)    # 'self' is the model itself. We are basically doing 'model.parameters()'
         criterion = torch.nn.CrossEntropyLoss()
 
+        # ? GPU FUNCTIONALITY HERE
         # Store the model inside the GPU memory
-        self.cuda()
+        #self.cuda()
 
         # Set the model to train mode to let know PyTorch that during backpropagation
         # it should not apply drop-out, batch norm or any layer with special behaviours
@@ -358,15 +370,23 @@ class Conv2DNet(nn.Module):
             #*
             for X, Y in zip(batch_x, batch_y):
 
+                """
+                print('\n### trainNet() ###')
+                print('\t type(X) = ', type(X))
+                print('\t X.shape = ', X.shape)
+                """
+
+                # ? GPU FUNCTIONALITY HERE
                 # Transfer the current batch tensors to the GPU if available
-                X = X.to(device)
-                Y = Y.to(device)
+                # X = X.to(device)
+                # Y = Y.to(device)
 
                 # Forward pass. This will automatically call the 'forward(self, x)' method
                 y_pred = self(X)    # 'self' is the model itself. We are basically doing 'model(X)'
 
+                # ? GPU FUNCTIONALITY HERE
                 # Transfer the created tensor to the GPU
-                y_pred = y_pred.to(device)
+                # y_pred = y_pred.to(device)
 
                 # Compute loss.
                 # Loss function needs the predicted outputs from 'model()' and a row vector with the same number of elements as the number of entries (rows) in 'y_pred'
@@ -454,8 +474,9 @@ class Conv2DNet(nn.Module):
             #*
             for X in batch_x:
 
+                # ? GPU FUNCTIONALITY HERE
                 # Transfer the current batch tensor to the GPU if available
-                X = X.to(device)
+                # X = X.to(device)
 
                 # For every single batch 'X', we calculate the label probabilities for every element.
                 # 'ps' is an array where each row represents the probabilities of each element to be one of the output classes returned by the model.
@@ -471,7 +492,6 @@ class Conv2DNet(nn.Module):
 
         return np.transpose(np.concatenate(pred_labels, axis = 1))
 
-
     #*
     #*#### END DEFINED FourLayerNet METHODS #####
     #*###########################################   
@@ -479,6 +499,37 @@ class Conv2DNet(nn.Module):
 #*
 #*#### Conv2DNet class  #####
 #*##############################
+
+#*##############################
+#*#### ConvBlock_2D class  #####
+#*
+class ConvBlock_2D(nn.Module):
+    
+    def __init__(self, in_channels, out_channels):
+        super().__init__()
+
+        self.conv1 = nn.Sequential(
+            nn.Conv2d(in_channels, out_channels, kernel_size = 1, stride = 1, padding = 1),
+            nn.BatchNorm2d(out_channels),
+            nn.ReLU(),
+        )
+
+        self.conv2 = nn.Sequential(
+            nn.Conv2d(out_channels, out_channels, kernel_size = 1, stride = 1, padding = 1),
+            nn.BatchNorm2d(out_channels),
+            nn.ReLU(),
+        )
+    
+    def forward(self, x):
+        x = self.conv1(x)
+        x = self.conv2(x)
+        x = F.avg_pool2d(x, 2)
+
+        return x
+#*
+#*#### ConvBlock_2D class  #####
+#*##############################
+
 
 #*#########################
 #*#### EXTRA METHODS  #####
@@ -498,6 +549,52 @@ def probs_2_label(one_hot_vects):
     """ 
     return np.array([np.where(r == np.amax(r))[0] + 1 for r in one_hot_vects]).transpose()
 
+def double_cross_validation(model, k_folds):
+    # todo: STRUCTURE TO PERFORM DOUBLE_CROSS_VALIDATION()
+    Kn = 0
+
+    best_Kn_OACC = 0
+    best_Kn_model = None
+
+    best_K_OACC = 0
+    best_K_model = None
+
+    for K in range(0, k_folds, 1):
+        print('\n\t\t Current K fold =', K+1)
+
+        for _ in range(0, k_folds, 1):
+            # Train CNN in current Kn fold using the calibration data
+            # model.trainNet(batch_x = calibration_data_folds[Kn], batch_y = calibration_label_folds[Kn], epochs = epochs, plot = False, lr = 0.01)
+
+            # Test CNN in current Kn fold using the validation data
+            # y_hat_Kn = model.predict(batch_x = validation_data_folds[Kn])
+
+            # Evaluate metrics by comparing the predicted labels with the true labels.
+            # Use the last column of labels since is the one containing the labels (others has coordenates)
+            # Kn_OACC = mts.get_metrics(validation_label_folds[Kn][-1], y_hat_Kn, cm_train.numUniqueLabels)['OACC']
+            # if (best_Kn_OACC < Kn_OACC):
+                # best_Kn_OACC = Kn_OACC
+
+                # Save Kn CNN model
+                # best_Kn_model = # todo: Method to save CNN model in variable!
+            
+
+            print('\t\t\t Current Kn fold =', Kn+1)
+            Kn += 1
+
+        # Test 'best_Kn_model' with current K test batch
+        # y_hat_K = best_Kn_model.predict(batch_x = test_data_folds[K])
+
+        # Evaluate metrics by comparing the predicted labels with the true labels.
+        # Use the last column of labels since is the one containing the labels (others has coordenates)
+        # K_OACC = mts.get_metrics(test_label_folds[K][-1], y_hat_K, cm_train.numUniqueLabels)['OACC']
+        # if (best_K_OACC < K_OACC):
+            # best_K_OACC = K_OACC
+
+            # Save K CNN model
+            # best_K_model = best_Kn_model
+
+    #return best_K_model
 #*
 #*#### END EXTRA METHODS  #####
 #*#############################
