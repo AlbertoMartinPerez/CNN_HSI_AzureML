@@ -1438,34 +1438,46 @@ class CubeManager:
 #*
 
 # todo: (Optional) modify the method to work with 2D batches (AT THE MOMENT ONLY WORK WITH 3D BATCHES)
-def single_cross_validation(batches, k_folds = 5):
+def kfold_double_cv_split(batch_data, batch_labels, k_folds = 5):
     """
-    Perform single-cross validation using K-fold cross-validator from sklearn. Extracts test and training
-    indexes from the input Python list and then returns 2 Python list with the batches for every K-fold and Kn-fold.
-    - Important: At the moment the 'single_cross_validation()' can only be performed if the input Python lisst 'batches' contains
+    Uses the K-fold cross-validator from sklearn to extracts test, calibration, and validation indexes from the input Python list.
+    This method generates 3 Python lists with the batches for every K-fold and Kn-fold. Therefore, it returns the splitted data to use
+    in a double-cross validation, where each index of 'test_data_folds' is for every K iteration and each indexes of 'calibration_data_folds'
+    and 'validation_data_folds' are for every Kn iteration. (The same happens with '_label_folds' lists)
+    - Important: At the moment the 'kfold_double_cv_split()' can only be performed if the input Python list 'batches' contains
     elements in 3D (if it includes patches).
     
     Inputs
     ----------
-    - 'batch':      Python list. Used to know the lenght of it (the number of batches that includes).
-    - 'k_folds':    Integer. Indicates the number of folds for the K-fold cross-validator.  
+    - 'batch_data':     Python list. Batches with data. Elements can be numpy arrays or PyTorch tensors.
+    - 'batch_labels':   Python list. Batches with labels. Elements can be numpy arrays or PyTorch tensors.
+    - 'k_folds':        Integer. Indicates the number of folds for the K-fold cross-validator.  
 
     Outputs
     ----------
-    - 'train_folds':    Python list. Each element includes the numpy batches destined to train the models for every single K-fold split.
-    - 'test_folds':     Python list. Each element includes the numpy batches destined to test the best models for every single K-fold split.
+    - 'calibration_data_folds':     Python list. Each index element includes the numpy data batches destined to train the models for every single Kn-fold split.
+    - 'calibration_label_folds':    Python list. Each index element includes the numpy label batches destined to train the models for every single Kn-fold split.
+    - 'validation_data_folds':      Python list. Each index element includes the numpy data batches destined to validate the best models for every single Kn-fold split.
+    - 'validation_label_folds':     Python list. Each index element includes the numpy label batches destined to validate the best models for every single Kn-fold split.
+    - 'test_data_folds':            Python list. Each index element includes the numpy data batches destined to test the best models for every single K-fold split.
+    - 'test_label_folds':           Python list. Each index element includes the numpy label batches destined to test the best models for every single K-fold split.
     """
 
     # Create numpy array with same lenght as the number of batches included in the Python list
     # This way we can extract the indices for the batches properly.
-    arr_1_loop = np.ones((len(batches), 1))
+    arr_1_loop = np.ones((len(batch_data), 1))
 
-    # Create empty lists to store the training and test batches for every fold split.
-    train_folds =  []
-    test_folds = []
+    # Create empty lists to store the calibration, validation, and test batches for every K and Kn fold split.
+    test_data_folds = []
+    test_label_folds = []
+    calibration_data_folds = []
+    calibration_label_folds = []
+    validation_data_folds = []
+    validation_label_folds = []
 
-    # Convert 'batch' Python list to a numpy array
-    batch_array = reshape_list_to_numpy(batches)
+    # Convert Python lists to numpy arrays
+    batch_data_array = reshape_list_to_numpy(batch_data)
+    batch_labels_array = reshape_list_to_numpy(batch_labels)
 
     # General KFold cross-validator using the passed number of 'k_folds'
     # Shuffle = False: consecutive folds will be the shifted version of previous fold.
@@ -1479,17 +1491,42 @@ def single_cross_validation(batches, k_folds = 5):
     #* ----> FIRST CROSS-VALIDATION LOOP (K)
     #*
     for train_k, test_k in kf.split( range(len(arr_1_loop)) ):
-        # Each iteration corresponds to 1 single fold split.
+        # Each iteration corresponds to 1 single K-fold split.
         # Append the batches using the indexes of the current fold split to the
         # created Python lists.
-        train_folds.append( batch_array[train_k, :, :, :, :] )
-        test_folds.append( batch_array[test_k, :, :, :, :]  )
+        test_data_folds.append( batch_data_array[test_k, :, :, :, :]  )
+        test_label_folds.append( batch_labels_array[test_k, :, :]  )
+
+        #*#########################################################
+        #* FOR LOOP TO EXTRACT ALL INDEXES TO SPLIT THE BATCHES 
+        #* FOR CALIBRATION AND VALIDATION. THIS INDEXES INDICATE WHICH 
+        #* BATCHES FROM THE INPUT BATCH LIST THAT ARE DESTINED TO
+        #* CALIBRATE AND VALIDATE.
+        #* ----> SECOND CROSS-VALIDATION LOOP (Kn)
+        #*
+
+        for train_kn, test_kn in kf.split( range(len(train_k)) ):
+            # Each iteration corresponds to 1 single K-n fold split.
+            # Append the batches using the indexes of the current fold split to the
+            # numpy batch arrays created in the first loop of the double-cross validation.
+            # Note: 'batch_data_array[train_k, :, :, :, :]' is a numpy array with all batches for the Kn folds
+            #       Adding '[train_kn, :, :, :, :]' to the end, extracts the batches for calibration while
+            #       adding '[test_kn, :, :, :, :]' to the end, extracts the batches for validation.
+            calibration_data_folds.append( batch_data_array[train_k, :, :, :, :][train_kn, :, :, :, :] )
+            calibration_label_folds.append( batch_labels_array[train_k, :, :][train_kn, :, :] )
+
+            validation_data_folds.append( batch_data_array[train_k, :, :, :, :][test_kn, :, :, :, :] )
+            validation_label_folds.append( batch_labels_array[train_k, :, :][test_kn, :, :] )
+            
+        #*
+        #* END FOR LOOP
+        #*###############
         
     #*
     #* END FOR LOOP
     #*###############
 
-    return train_folds, test_folds
+    return test_data_folds, test_label_folds, calibration_data_folds, calibration_label_folds, validation_data_folds, validation_label_folds 
 
 #*
 #*#### Single-cross validation method #####
@@ -1502,42 +1539,78 @@ def single_cross_validation(batches, k_folds = 5):
 
 def reshape_list_to_numpy(python_list):
     """
-    Create a 5D numpy array to append all 4D elements included in the input 'python_list'.
-    Used tin 'single_cross_validation()' method to properly extract which batches should be used for
+    Create a numpy array with +1D to append all elements included in the input 'python_list'.
+    It works with batches with data (4D) and labels (2D).
+    Used in 'single_cross_validation()' method to properly extract which batches should be used for
     training and which for testing on each K-fold.
 
     Input
     --------
-    - 'python_list': Python list. Each element should have shape '( num_patches, num_features, patch_height, patch_width ).
+    - 'python_list': Python list. If working with 4D, each element should have shape '( num_patches, num_features, patch_height, patch_width ).
+    If working with 2D, each element should have shape '( num_batch, (x, y, label) )'
 
     Output
     --------
-    - 'batch_array_5d': Numpy array. Final shape is '( num_batches, num_patches, num_features, patch_heigh, patch_width )'
-
+    It only retrieves 1 output depending of the shape of the input Python List:
+    - 'batch_array_5d': Numpy array. In case Python list has 4D. Final shape is '(num_batches, num_patches, num_features, patch_heigh, patch_width)'
+    - 'batch_array_3d': Numpy array. In case Python list has 2D. Final shape is '(num_batches, (x, y, label))'
     """
 
-    # Create empty array with shape '( num_batches, num_patches, num_features, patch_height, patch_width )'
-    # The idea is to work with a numpy array where dimensions correspond to '( num_batches, num_patches, num_features, height, width )'
-    batch_array_5d = np.zeros((len(python_list), python_list[0].shape[0], python_list[0].shape[1], python_list[0].shape[2], python_list[0].shape[3]))
-
-    #*############################################################
-    #* FOR LOOP ITERATES OVER ALL ELEMENTS IN THE INPUT LIST
-    #* AND STACK THEM IN THE TEMPORARY ARRAY
+    #*###############################################
+    #* IF ELSE STATEMENT TO EVALUATE THE SHAPE OF
+    #* THE INPUT PYTHON LIST
     #*
-    i = 0
-    for element in python_list:
+    if (len(python_list[0].shape) == 4):
+        # Create empty array with shape '( num_batches, num_patches, num_features, patch_height, patch_width )'
+        # The idea is to work with a numpy array where dimensions correspond to '( num_batches, num_patches, num_features, height, width )'
+        batch_array_5d = np.zeros((len(python_list), python_list[0].shape[0], python_list[0].shape[1], python_list[0].shape[2], python_list[0].shape[3]))
 
-        # Save inside the 'patches' variable each small 3D patch of size "number of bands" x "patch_size" x "patch_size"
-		# Use 'self.cube' attribute which contains the 'preProcessed' image. From the 'preProcessed' image extract small patches
-		# from the coordenates extracted.
-        batch_array_5d[i, :, :, :, :] = element
-        i += 1
+        #*############################################################
+        #* FOR LOOP ITERATES OVER ALL ELEMENTS IN THE INPUT LIST
+        #* AND STACK THEM IN THE TEMPORARY ARRAY
+        #*
+        i = 0
+        for element in python_list:
+
+            # Save inside the 'patches' variable each small 3D patch of size "number of bands" x "patch_size" x "patch_size"
+            # Use 'self.cube' attribute which contains the 'preProcessed' image. From the 'preProcessed' image extract small patches
+            # from the coordenates extracted.
+            batch_array_5d[i, :, :, :, :] = element
+            i += 1
+        
+        #*
+        #* END FOR LOOP
+        #*##############
+
+        return batch_array_5d
     
-    #*
-    #* END FOR LOOP
-    #*##############
+    elif (len(python_list[0].shape) == 2):
 
-    return batch_array_5d
+        # Create empty array with shape '(num_batches, x_coord, y_coord, label)'
+        # The idea is to work with a numpy array where dimensions correspond to '(num_batches, (x, y, label))'
+        batch_array_3d = np.zeros((len(python_list), python_list[0].shape[0], python_list[0].shape[1]))
+
+        #*############################################################
+        #* FOR LOOP ITERATES OVER ALL ELEMENTS IN THE INPUT LIST
+        #* AND STACK THEM IN THE TEMPORARY ARRAY
+        #*
+        i = 0
+        for element in python_list:
+
+            # Save inside the 'patches' variable each small 3D patch of size "number of bands" x "patch_size" x "patch_size"
+            # Use 'self.cube' attribute which contains the 'preProcessed' image. From the 'preProcessed' image extract small patches
+            # from the coordenates extracted.
+            batch_array_3d[i, :, :] = element
+            i += 1
+        
+        #*
+        #* END FOR LOOP
+        #*##############
+        
+        return batch_array_3d
+    #*
+    #* END OF IF ELSE
+    #*###############################################
 
 #*
 #*#### Reshape list to numpy method #####
