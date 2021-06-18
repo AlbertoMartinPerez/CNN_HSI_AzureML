@@ -294,17 +294,16 @@ class Conv2DNet(nn.Module):
 
         #* DEFINE NETWORK LAYERS
         self.conv = nn.Sequential(
-            ConvBlock_2D(in_channels=in_channels, out_channels=64),
-            ConvBlock_2D(in_channels=64, out_channels=128),
-            ConvBlock_2D(in_channels=128, out_channels=256),
-            ConvBlock_2D(in_channels=256, out_channels=512),
+            nn.Conv2d(in_channels, out_channels = 16, kernel_size = 2, stride = 1, padding = 0),
+            nn.MaxPool2d(kernel_size=2),    # MaxPool2d() comput the output shape using 'floor' by default! If input patches are 7x7, kernel_size = 2 -> 3x3 patches!
+            nn.ReLU(),
+            nn.Flatten(),   # Flatten the dimension of the tensor by using its start_dim=0, end_dim=-1
         )
 
         self.fc = nn.Sequential(
-            nn.Linear(4, 128),
-            nn.PReLU(),
-            nn.BatchNorm1d(128),
-            nn.Linear(128, num_classes),
+            nn.Linear(16*3*3, 64),  # Input features should bet (output_channels last conv layer * patch_width * patch_height)
+            nn.ReLU(),
+            nn.Linear(64, num_classes),
         )
 
     def forward(self, x):
@@ -318,7 +317,7 @@ class Conv2DNet(nn.Module):
         - x:    Input PyTorch tensor used to compute the forward pass
         """
         x = self.conv(x)
-        #x = self.fc(x)
+        x = self.fc(x)
         return x
 
     def trainNet(self, batch_x, batch_y, epochs = 500, plot = False, lr = 0.002):
@@ -370,12 +369,6 @@ class Conv2DNet(nn.Module):
             #*
             for X, Y in zip(batch_x, batch_y):
 
-                """
-                print('\n### trainNet() ###')
-                print('\t type(X) = ', type(X))
-                print('\t X.shape = ', X.shape)
-                """
-
                 # ? GPU FUNCTIONALITY HERE
                 # Transfer the current batch tensors to the GPU if available
                 # X = X.to(device)
@@ -389,12 +382,12 @@ class Conv2DNet(nn.Module):
                 # y_pred = y_pred.to(device)
 
                 # Compute loss.
-                # Loss function needs the predicted outputs from 'model()' and a row vector with the same number of elements as the number of entries (rows) in 'y_pred'
-                # The problem is that loading 'label4Classes' and convert them as Pytorch tensor, we need to manipulate it, since the shape of the number of labels stored
-                # in 'y' has shape of 'torch.Size([10, 1])' when it should be 'torch.Size([10])'. To achieve that, we can transpose the vector to have 1 row and N columns (using '.T') and
-                # then extract the first row ('[0]').
+                # Loss function needs the predicted outputs from 'sef.model()' (or 'self(x)' in our case) and a row vector
+                # with the same number of elements as the number of entries (rows) in 'y_pred'
+                # batch_y has dimensions (16, 3), so each batch Y has (x_coord, y_coord, label). Since we only want the labels
+                # for the criterion, we have to only extract the last column.
                 # Please note: 'torch.nn.CrossEntropyLoss()' needs labels starting from 0 to Number of classes -1. That is why we apply -1 since labels should start at 0 and not 1, as saved in 'label4Classes'
-                loss = criterion(y_pred, Y.T[0]-1 )
+                loss = criterion(y_pred, Y[:, -1] - 1 )
 
                 # Before the backward pass, use the optimizer object to zero all of the
                 # gradients for the variables it will update (which are the learnable weights
@@ -436,31 +429,16 @@ class Conv2DNet(nn.Module):
 
     def predict(self, batch_x):
         """
-        Predict 2D batches of data with a Conv2DNet model
+        Predict 3D patches of data with a Conv2DNet model.
         
         Inputs
         ----------
-        - 'batch_x':        Python list containing PyTorch tensor batches destined for training
+        - 'batch_x':        PyTorch tensor batches to predict
         
         Outputs
         ----------
-        - 'pred_labels':    Python list containing numpy arrays with the labels for every element in every batch
+        - 'pred_labels':    Numpy array with the labels for every element in every batch
         """ 
-        #*################
-        #* ERROR CHECKER
-        #*
-        # Check if input parameter is a python list
-        if not ( isinstance(batch_x, list) ):
-            raise RuntimeError("Expected a python list as input. Received instead element of type: ", str(type(batch_x)) )
-        # Check if python list is empty
-        if (len(batch_x) == 0):
-            raise RuntimeError("Not expected an empty python list input. 'batch_x' is empty.")
-        # Check if first python list element is a PyTorch tensor
-        if not ( isinstance(batch_x[0], torch.Tensor) ):
-            raise TypeError("Expected first element of 'batch_x' to be 'torch.Tensor'. Received instead element of type: ", str(type(batch_x[0])) )
-        #*    
-        #* END OF ERROR CHECKER ###
-        #*#########################
 
         # Create empty Python lists to store all labels predicted for every batch
         pred_labels = []
@@ -500,37 +478,6 @@ class Conv2DNet(nn.Module):
 #*#### Conv2DNet class  #####
 #*##############################
 
-#*##############################
-#*#### ConvBlock_2D class  #####
-#*
-class ConvBlock_2D(nn.Module):
-    
-    def __init__(self, in_channels, out_channels):
-        super().__init__()
-
-        self.conv1 = nn.Sequential(
-            nn.Conv2d(in_channels, out_channels, kernel_size = 1, stride = 1, padding = 1),
-            nn.BatchNorm2d(out_channels),
-            nn.ReLU(),
-        )
-
-        self.conv2 = nn.Sequential(
-            nn.Conv2d(out_channels, out_channels, kernel_size = 1, stride = 1, padding = 1),
-            nn.BatchNorm2d(out_channels),
-            nn.ReLU(),
-        )
-    
-    def forward(self, x):
-        x = self.conv1(x)
-        x = self.conv2(x)
-        x = F.avg_pool2d(x, 2)
-
-        return x
-#*
-#*#### ConvBlock_2D class  #####
-#*##############################
-
-
 #*#########################
 #*#### EXTRA METHODS  #####
 #*
@@ -549,52 +496,6 @@ def probs_2_label(one_hot_vects):
     """ 
     return np.array([np.where(r == np.amax(r))[0] + 1 for r in one_hot_vects]).transpose()
 
-def double_cross_validation(model, k_folds):
-    # todo: STRUCTURE TO PERFORM DOUBLE_CROSS_VALIDATION()
-    Kn = 0
-
-    best_Kn_OACC = 0
-    best_Kn_model = None
-
-    best_K_OACC = 0
-    best_K_model = None
-
-    for K in range(0, k_folds, 1):
-        print('\n\t\t Current K fold =', K+1)
-
-        for _ in range(0, k_folds, 1):
-            # Train CNN in current Kn fold using the calibration data
-            # model.trainNet(batch_x = calibration_data_folds[Kn], batch_y = calibration_label_folds[Kn], epochs = epochs, plot = False, lr = 0.01)
-
-            # Test CNN in current Kn fold using the validation data
-            # y_hat_Kn = model.predict(batch_x = validation_data_folds[Kn])
-
-            # Evaluate metrics by comparing the predicted labels with the true labels.
-            # Use the last column of labels since is the one containing the labels (others has coordenates)
-            # Kn_OACC = mts.get_metrics(validation_label_folds[Kn][-1], y_hat_Kn, cm_train.numUniqueLabels)['OACC']
-            # if (best_Kn_OACC < Kn_OACC):
-                # best_Kn_OACC = Kn_OACC
-
-                # Save Kn CNN model
-                # best_Kn_model = # todo: Method to save CNN model in variable!
-            
-
-            print('\t\t\t Current Kn fold =', Kn+1)
-            Kn += 1
-
-        # Test 'best_Kn_model' with current K test batch
-        # y_hat_K = best_Kn_model.predict(batch_x = test_data_folds[K])
-
-        # Evaluate metrics by comparing the predicted labels with the true labels.
-        # Use the last column of labels since is the one containing the labels (others has coordenates)
-        # K_OACC = mts.get_metrics(test_label_folds[K][-1], y_hat_K, cm_train.numUniqueLabels)['OACC']
-        # if (best_K_OACC < K_OACC):
-            # best_K_OACC = K_OACC
-
-            # Save K CNN model
-            # best_K_model = best_Kn_model
-
-    #return best_K_model
 #*
 #*#### END EXTRA METHODS  #####
 #*#############################
