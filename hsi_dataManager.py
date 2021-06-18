@@ -12,6 +12,9 @@ import torch                                # Import PyTorch
 from scipy.io import loadmat                # Import scipy.io to load .mat files
 from sklearn.model_selection import KFold   # Import KFold cross-validator from sklearn
 
+import metrics as mts                       # Import 'metrics.py' file as 'mts' to evluate metrics inside CrossValidator class
+import nn_models as models                  # Import 'nn_models.py' file as 'models' to define any new Neural Network included in the file 
+
 #*################################
 #*#### DatasetManager class  #####
 #*
@@ -396,8 +399,7 @@ class DatasetManager:
 #*#############################
 #*#### CubeManager class  #####
 #*
-
-# todo: Add error checker to warn user when loaded ground-truths have different number of total labels
+# todo: (Optional) Add error checker to warn user when loaded ground-truths have different number of total labels
 class CubeManager:
     """
     This class is used to load '_cropped_Pre-processed.mat' files destined to work with Neural Network models, both for training and classification.
@@ -1435,188 +1437,316 @@ class CubeManager:
 #*#### CubeManager class  #####
 #*#############################
 
-#*##################################################
-#*#### kfold_double_cv_split validation method #####
+#*#######################
+#* CrossValidator class
 #*
-
-# todo: (Optional) modify the method to work with 2D batches (AT THE MOMENT ONLY WORK WITH 3D BATCHES)
-def kfold_double_cv_split(batch_data, batch_labels, k_folds = 5):
+class CrossValidator:
     """
-    Uses the K-fold cross-validator from sklearn to extracts test, calibration, and validation indexes from the input Python list.
-    This method generates 3 Python lists with the batches for every K-fold and Kn-fold. Therefore, it returns the splitted data to use
-    in a double-cross validation, where each index of 'test_data_folds' is for every K iteration and each indexes of 'calibration_data_folds'
-    and 'validation_data_folds' are for every Kn iteration. (The same happens with '_label_folds' lists)
-    - Important: At the moment the 'kfold_double_cv_split()' can only be performed if the input Python list 'batches' contains
-    elements in 3D (if it includes patches).
+    This class uses K-fold cross validator to split the data and to perform double-cross validation
+    over PyTorch CNN models.
     
-    Inputs
-    ----------
-    - 'batch_data':     Python list. Batches with data. Elements can be numpy arrays or PyTorch tensors.
-    - 'batch_labels':   Python list. Batches with labels. Elements can be numpy arrays or PyTorch tensors.
-    - 'k_folds':        Integer. Indicates the number of folds for the K-fold cross-validator.  
-
-    Outputs
-    ----------
-    - 'calibration_data_folds':     Python list. Each index element includes the numpy data batches destined to train the models for every single Kn-fold split.
-    - 'calibration_label_folds':    Python list. Each index element includes the numpy label batches destined to train the models for every single Kn-fold split.
-    - 'validation_data_folds':      Python list. Each index element includes the numpy data batches destined to validate the best models for every single Kn-fold split.
-    - 'validation_label_folds':     Python list. Each index element includes the numpy label batches destined to validate the best models for every single Kn-fold split.
-    - 'test_data_folds':            Python list. Each index element includes the numpy data batches destined to test the best models for every single K-fold split.
-    - 'test_label_folds':           Python list. Each index element includes the numpy label batches destined to test the best models for every single K-fold split.
     """
+    def __init__(self, batch_data, batch_labels, k_folds=5, numUniqueLabels=None, numBands=25, epochs=100, lr=0.01):
+        """
+        Define the constructor of 'CrossValidator' class.
 
-    # Create numpy array with same lenght as the number of batches included in the Python list
-    # This way we can extract the indices for the batches properly.
-    arr_1_loop = np.ones((len(batch_data), 1))
+        Inputs
+        ----------
+        - 'batch_data':         Python list. Batches with data. Elements can be numpy arrays or PyTorch tensors.
+        - 'batch_labels':       Python list. Batches with labels. Elements can be numpy arrays or PyTorch tensors.
+        - 'k_folds':            Integer. Indicates the number of folds for the K-fold cross-validator.
+        - 'numUniqueLabels':    Integer. Indicates the number of unique labels in the batches.
+        - 'numBands':           Integer. Indicates the spectral bands included in the batches.
+        - 'epochs':             Integer. Indicates the number of epochs used to train the CNN models.
+        - 'lr':                 Integer. Learning rate used for the optimizer when training CNN models.
 
-    # Create empty lists to store the calibration, validation, and test batches for every K and Kn fold split.
-    test_data_folds = []
-    test_label_folds = []
-    calibration_data_folds = []
-    calibration_label_folds = []
-    validation_data_folds = []
-    validation_label_folds = []
+        Attributes
+        ----------
+        - 'calibration_data_folds':     Python list. Each index element includes the numpy data batches destined to train the models for every single Kn-fold split.
+        - 'calibration_label_folds':    Python list. Each index element includes the numpy label batches destined to train the models for every single Kn-fold split.
+        - 'validation_data_folds':      Python list. Each index element includes the numpy data batches destined to validate the best models for every single Kn-fold split.
+        - 'validation_label_folds':     Python list. Each index element includes the numpy label batches destined to validate the best models for every single Kn-fold split.
+        - 'test_data_folds':            Python list. Each index element includes the numpy data batches destined to test the best models for every single K-fold split.
+        - 'test_label_folds':           Python list. Each index element includes the numpy label batches destined to test the best models for every single K-fold split.
+        - 'bestModel':                  Toch. PyTorch model obtained after performing a K-fold double-cross validation.
+        """
 
-    # Convert Python lists to numpy arrays
-    batch_data_array = reshape_list_to_numpy(batch_data)
-    batch_labels_array = reshape_list_to_numpy(batch_labels)
+        self.batch_data = batch_data
+        self.batch_labels = batch_labels
+        self.k_folds = k_folds
+        self.numUniqueLabels = numUniqueLabels
+        self.numBands = numBands
+        self.epochs = epochs
+        self.lr = lr
 
-    # General KFold cross-validator using the passed number of 'k_folds'
-    # Shuffle = False: consecutive folds will be the shifted version of previous fold.
-    kf = KFold(n_splits = k_folds, shuffle = False)
+        self.test_data_folds = None
+        self.test_label_folds = None
+        self.calibration_data_folds = None
+        self.calibration_label_folds = None
+        self.validation_data_folds = None
+        self.validation_label_folds = None
 
-    #*#########################################################
-    #* FOR LOOP TO EXTRACT ALL INDEXES TO SPLIT THE BATCHES 
-    #* FOR TRAINING AND TEST. THIS INDEXES INDICATE WHICH 
-    #* BATCHES FROM THE INPUT BATCH LIST THAT ARE DESTINED TO
-    #* TRAIN AND TEST.
-    #* ----> FIRST CROSS-VALIDATION LOOP (K)
-    #*
-    for train_k, test_k in kf.split( range(len(arr_1_loop)) ):
-        # Each iteration corresponds to 1 single K-fold split.
-        # Append the batches using the indexes of the current fold split to the
-        # created Python lists.
-        test_data_folds.append( batch_data_array[test_k, :, :, :, :]  )
-        test_label_folds.append( batch_labels_array[test_k, :, :]  )
+        self.bestModel = None
+
+
+    # todo: (Optional) modify the method to work with 2D batches (AT THE MOMENT ONLY WORK WITH 3D BATCHES)
+    def __kfold_double_cv_split(self):
+        """
+        (Private method) Uses the K-fold cross-validator from sklearn to extracts test, calibration, and validation indexes from the input Python list.
+        This method generates 3 Python lists with the batches for every K-fold and Kn-fold. Therefore, it returns the splitted data to use
+        in a double-cross validation, where each index of 'test_data_folds' is for every K iteration and each indexes of 'calibration_data_folds'
+        and 'validation_data_folds' are for every Kn iteration. (The same happens with '_label_folds' lists)
+        - Important: At the moment the '__kfold_double_cv_split()' can only be performed if the input Python list 'batches' contains
+        elements in 3D (if it includes patches).
+        """
+        # Create numpy array with same lenght as the number of batches included in the Python list
+        # This way we can extract the indices for the batches properly.
+        arr_1_loop = np.ones((len(self.batch_data), 1))
+
+        # Create empty lists to store the calibration, validation, and test batches for every K and Kn fold split.
+        test_data_folds = []
+        test_label_folds = []
+        calibration_data_folds = []
+        calibration_label_folds = []
+        validation_data_folds = []
+        validation_label_folds = []
+
+        # Convert Python lists to numpy arrays
+        batch_data_array = self.__reshape_list_to_numpy(self.batch_data)
+        batch_labels_array = self.__reshape_list_to_numpy(self.batch_labels)
+
+        # General KFold cross-validator using the passed number of 'k_folds'
+        # Shuffle = False: consecutive folds will be the shifted version of previous fold.
+        kf = KFold(n_splits = self.k_folds, shuffle = False)
 
         #*#########################################################
         #* FOR LOOP TO EXTRACT ALL INDEXES TO SPLIT THE BATCHES 
-        #* FOR CALIBRATION AND VALIDATION. THIS INDEXES INDICATE WHICH 
+        #* FOR TRAINING AND TEST. THIS INDEXES INDICATE WHICH 
         #* BATCHES FROM THE INPUT BATCH LIST THAT ARE DESTINED TO
-        #* CALIBRATE AND VALIDATE.
-        #* ----> SECOND CROSS-VALIDATION LOOP (Kn)
+        #* TRAIN AND TEST.
+        #* ----> FIRST CROSS-VALIDATION LOOP (K)
         #*
-
-        for train_kn, test_kn in kf.split( range(len(train_k)) ):
-            # Each iteration corresponds to 1 single K-n fold split.
+        for train_k, test_k in kf.split( range(len(arr_1_loop)) ):
+            # Each iteration corresponds to 1 single K-fold split.
             # Append the batches using the indexes of the current fold split to the
-            # numpy batch arrays created in the first loop of the double-cross validation.
-            # Note: 'batch_data_array[train_k, :, :, :, :]' is a numpy array with all batches for the Kn folds
-            #       Adding '[train_kn, :, :, :, :]' to the end, extracts the batches for calibration while
-            #       adding '[test_kn, :, :, :, :]' to the end, extracts the batches for validation.
-            calibration_data_folds.append( batch_data_array[train_k, :, :, :, :][train_kn, :, :, :, :] )
-            calibration_label_folds.append( batch_labels_array[train_k, :, :][train_kn, :, :] )
+            # created Python lists.
+            test_data_folds.append( batch_data_array[test_k, :, :, :, :]  )
+            test_label_folds.append( batch_labels_array[test_k, :, :]  )
 
-            validation_data_folds.append( batch_data_array[train_k, :, :, :, :][test_kn, :, :, :, :] )
-            validation_label_folds.append( batch_labels_array[train_k, :, :][test_kn, :, :] )
+            #*#########################################################
+            #* FOR LOOP TO EXTRACT ALL INDEXES TO SPLIT THE BATCHES 
+            #* FOR CALIBRATION AND VALIDATION. THIS INDEXES INDICATE WHICH 
+            #* BATCHES FROM THE INPUT BATCH LIST THAT ARE DESTINED TO
+            #* CALIBRATE AND VALIDATE.
+            #* ----> SECOND CROSS-VALIDATION LOOP (Kn)
+            #*
+
+            for train_kn, test_kn in kf.split( range(len(train_k)) ):
+                # Each iteration corresponds to 1 single K-n fold split.
+                # Append the batches using the indexes of the current fold split to the
+                # numpy batch arrays created in the first loop of the double-cross validation.
+                # Note: 'batch_data_array[train_k, :, :, :, :]' is a numpy array with all batches for the Kn folds
+                #       Adding '[train_kn, :, :, :, :]' to the end, extracts the batches for calibration while
+                #       adding '[test_kn, :, :, :, :]' to the end, extracts the batches for validation.
+                calibration_data_folds.append( batch_data_array[train_k, :, :, :, :][train_kn, :, :, :, :] )
+                calibration_label_folds.append( batch_labels_array[train_k, :, :][train_kn, :, :] )
+
+                validation_data_folds.append( batch_data_array[train_k, :, :, :, :][test_kn, :, :, :, :] )
+                validation_label_folds.append( batch_labels_array[train_k, :, :][test_kn, :, :] )
+                
+            #*
+            #* END FOR LOOP
+            #*###############
             
         #*
         #* END FOR LOOP
         #*###############
+
+        # Save all data and label folds into the instance attributes
+        self.test_data_folds = test_data_folds
+        self.test_label_folds = test_label_folds
+        self.calibration_data_folds = calibration_data_folds
+        self.calibration_label_folds = calibration_label_folds
+        self.validation_data_folds = validation_data_folds
+        self.validation_label_folds = validation_label_folds 
+
+    def __reshape_list_to_numpy(self, python_list):
+        """
+        (Private method) Create a numpy array with +1D to append all elements included in the input 'python_list'.
+        It works with batches with data (4D) and labels (2D).
+        Used in 'single_cross_validation()' method to properly extract which batches should be used for
+        training and which for testing on each K-fold.
+
+        Input
+        --------
+        - 'python_list': Python list. If working with 4D, each element should have shape '( num_patches, num_features, patch_height, patch_width ).
+        If working with 2D, each element should have shape '( num_batch, (x, y, label) )'
+
+        Output
+        --------
+        It only retrieves 1 output depending of the shape of the input Python List:
+        - 'batch_array_5d': Numpy array. In case Python list has 4D. Final shape is '(num_batches, num_patches, num_features, patch_heigh, patch_width)'
+        - 'batch_array_3d': Numpy array. In case Python list has 2D. Final shape is '(num_batches, (x, y, label))'
+        """
+
+        #*###############################################
+        #* IF ELSE STATEMENT TO EVALUATE THE SHAPE OF
+        #* THE INPUT PYTHON LIST
+        #*
+        if (len(python_list[0].shape) == 4):
+            # Create empty array with shape '( num_batches, num_patches, num_features, patch_height, patch_width )'
+            # The idea is to work with a numpy array where dimensions correspond to '( num_batches, num_patches, num_features, height, width )'
+            batch_array_5d = np.zeros((len(python_list), python_list[0].shape[0], python_list[0].shape[1], python_list[0].shape[2], python_list[0].shape[3]))
+
+            #*############################################################
+            #* FOR LOOP ITERATES OVER ALL ELEMENTS IN THE INPUT LIST
+            #* AND STACK THEM IN THE TEMPORARY ARRAY
+            #*
+            i = 0
+            for element in python_list:
+
+                # Save inside the 'patches' variable each small 3D patch of size "number of bands" x "patch_size" x "patch_size"
+                # Use 'self.cube' attribute which contains the 'preProcessed' image. From the 'preProcessed' image extract small patches
+                # from the coordenates extracted.
+                batch_array_5d[i, :, :, :, :] = element
+                i += 1
+            
+            #*
+            #* END FOR LOOP
+            #*##############
+
+            return batch_array_5d
         
-    #*
-    #* END FOR LOOP
-    #*###############
+        elif (len(python_list[0].shape) == 2):
 
-    return test_data_folds, test_label_folds, calibration_data_folds, calibration_label_folds, validation_data_folds, validation_label_folds 
+            # Create empty array with shape '(num_batches, x_coord, y_coord, label)'
+            # The idea is to work with a numpy array where dimensions correspond to '(num_batches, (x, y, label))'
+            batch_array_3d = np.zeros((len(python_list), python_list[0].shape[0], python_list[0].shape[1]))
 
+            #*############################################################
+            #* FOR LOOP ITERATES OVER ALL ELEMENTS IN THE INPUT LIST
+            #* AND STACK THEM IN THE TEMPORARY ARRAY
+            #*
+            i = 0
+            for element in python_list:
+
+                # Save inside the 'patches' variable each small 3D patch of size "number of bands" x "patch_size" x "patch_size"
+                # Use 'self.cube' attribute which contains the 'preProcessed' image. From the 'preProcessed' image extract small patches
+                # from the coordenates extracted.
+                batch_array_3d[i, :, :] = element
+                i += 1
+            
+            #*
+            #* END FOR LOOP
+            #*##############
+            
+            return batch_array_3d
+        #*
+        #* END OF IF ELSE
+        #*###############################################
+
+    def double_cross_validation(self):
+        """
+        Perform a K-fold double-cross validation and stores in the instance attribute 'self.bestModel' the
+        best model. It calls '__kfold_double_cv_split()' internally to split the data for every K and Kn folds.
+        Trained models are 'Conv2DNet'.
+        """
+
+        print("\tSplitting data before performing K-fold double-cross validation...")
+        self.__kfold_double_cv_split()
+        print("\tData has been splitted. Performing ", self.k_folds ,"fold double-cross validation...")
+
+        print('\n\t### DOUBLE-CROSS VALIDATION ###')
+        #*###############################################################
+        #* FOR ITERATION FOR THE OUTER DOUBLE-CROSS VALIDATION LOOP (K)
+        #*
+        best_K_OACC = 0
+        Kn = 0
+
+        for K in range(0, self.k_folds, 1):
+            print('\n\t\t Current K fold =', K+1)
+
+            #*################################################################
+            #* FOR ITERATION FOR THE INNER DOUBLE-CROSS VALIDATION LOOP (Kn)
+            #*
+            best_Kn_OACC = 0
+            
+            for _ in range(0, self.k_folds, 1):
+                print('\t\t\t Current Kn fold =', Kn+1)
+                
+                # Create a Conv2DNet model. We need to define a new one for every Kn iteration
+                model = models.Conv2DNet(num_classes = self.numUniqueLabels, in_channels = self.numBands)
+
+                # Convert calibration data to tensor
+                batch_x = torch.from_numpy(self.calibration_data_folds[Kn]).type(torch.float)
+                batch_y = torch.from_numpy(self.calibration_label_folds[Kn]).type(torch.LongTensor)
+
+                # Train CNN in current Kn fold using the calibration data
+                model.trainNet(batch_x = batch_x, batch_y = batch_y, epochs = self.epochs, plot = False, lr = self.lr)
+
+                # Convert validation data to tensor
+                batch_x_val = torch.from_numpy(self.validation_data_folds[Kn]).type(torch.float)
+
+                # Test CNN in current Kn fold using the validation data
+                y_hat_Kn = model.predict(batch_x = batch_x_val)
+
+                # Manipulate 'validation_label_folds' for the current 'Kn'.
+                # We first need to concatenate all batches together with 'np.concatenate()' along the rows (axis=0)
+                # Then we extract the labels and not the coordenates (remember that '_labels_folds' variables have (x_coord, y_coord, label)).
+                # Since the result is of shape (N,) and the shape of 'y_hat_Kn' is (N, 1), we need to reshape (-1 indicates to take the entire lenght)
+                # We convert it as integers since they originally are floats and we need the labels as indexes inside 'get_metrics()'
+                y_true_Kn = np.concatenate(self.validation_label_folds[Kn], axis = 0)[:, -1].reshape((-1,1)).astype(int)
+
+                # Evaluate metrics by comparing the predicted labels with the true labels for the current Kn fold
+                Kn_OACC = mts.get_metrics(y_true_Kn, y_hat_Kn, self.numUniqueLabels)['OACC']
+
+                if (best_Kn_OACC < Kn_OACC):
+                    print('\t\t\t Found new best model!')
+                    best_Kn_OACC = Kn_OACC
+
+                    # Save Kn CNN model in local variable
+                    best_Kn_model = model
+                
+                Kn += 1
+            #*
+            #* END OF INNER DOUBLE-CROSS VALIDATION LOOP (Kn)
+            #*################################################
+
+            # Convert test data to tensor
+            batch_x_test = torch.from_numpy(self.test_data_folds[K]).type(torch.float)
+
+            # Test 'best_Kn_model' with current K test batch
+            y_hat_K = best_Kn_model.predict(batch_x = batch_x_test)
+
+            # Manipulate 'validation_label_folds' for the current 'Kn'.
+            # We first need to concatenate all batches together with 'np.concatenate()' along the rows (axis=0)
+            # Then we extract the labels and not the coordenates (remember that '_labels_folds' variables have (x_coord, y_coord, label)).
+            # Since the result is of shape (N,) and the shape of 'y_hat_Kn' is (N, 1), we need to reshape (-1 indicates to take the entire lenght)
+            # We convert it as integers since they originally are floats and we need the labels as indexes inside 'get_metrics()'
+            y_true_K = np.concatenate(self.test_label_folds[K], axis = 0)[:, -1].reshape((-1,1)).astype(int)
+
+            # Evaluate metrics by comparing the predicted labels with the true labels for the current K fold
+            # Use the last column of labels since is the one containing the labels (others has coordenates)
+            K_OACC = mts.get_metrics(y_true_K, y_hat_K, self.numUniqueLabels)['OACC']
+
+            if (best_K_OACC < K_OACC):
+                print('\t\t Found new best model!')
+                best_K_OACC = K_OACC
+
+                # Save or update best CNN model obtained during double cross-validation
+                self.bestModel = best_Kn_model
+                
+        #*
+        #* END OF OUTER DOUBLE-CROSS VALIDATION LOOP (Kn)
+        #*#################################################
+
+        print('\n\t### DOUBLE-CROSS VALIDATION IS FINISHED ###')
 #*
-#*#### kfold_double_cv_split validation method #####
-#*##################################################
+#* CrossValidator class
+#*#######################
 
 
-#*#######################################
-#*#### Reshape list to numpy method #####
-#*
 
-def reshape_list_to_numpy(python_list):
-    """
-    Create a numpy array with +1D to append all elements included in the input 'python_list'.
-    It works with batches with data (4D) and labels (2D).
-    Used in 'single_cross_validation()' method to properly extract which batches should be used for
-    training and which for testing on each K-fold.
-
-    Input
-    --------
-    - 'python_list': Python list. If working with 4D, each element should have shape '( num_patches, num_features, patch_height, patch_width ).
-    If working with 2D, each element should have shape '( num_batch, (x, y, label) )'
-
-    Output
-    --------
-    It only retrieves 1 output depending of the shape of the input Python List:
-    - 'batch_array_5d': Numpy array. In case Python list has 4D. Final shape is '(num_batches, num_patches, num_features, patch_heigh, patch_width)'
-    - 'batch_array_3d': Numpy array. In case Python list has 2D. Final shape is '(num_batches, (x, y, label))'
-    """
-
-    #*###############################################
-    #* IF ELSE STATEMENT TO EVALUATE THE SHAPE OF
-    #* THE INPUT PYTHON LIST
-    #*
-    if (len(python_list[0].shape) == 4):
-        # Create empty array with shape '( num_batches, num_patches, num_features, patch_height, patch_width )'
-        # The idea is to work with a numpy array where dimensions correspond to '( num_batches, num_patches, num_features, height, width )'
-        batch_array_5d = np.zeros((len(python_list), python_list[0].shape[0], python_list[0].shape[1], python_list[0].shape[2], python_list[0].shape[3]))
-
-        #*############################################################
-        #* FOR LOOP ITERATES OVER ALL ELEMENTS IN THE INPUT LIST
-        #* AND STACK THEM IN THE TEMPORARY ARRAY
-        #*
-        i = 0
-        for element in python_list:
-
-            # Save inside the 'patches' variable each small 3D patch of size "number of bands" x "patch_size" x "patch_size"
-            # Use 'self.cube' attribute which contains the 'preProcessed' image. From the 'preProcessed' image extract small patches
-            # from the coordenates extracted.
-            batch_array_5d[i, :, :, :, :] = element
-            i += 1
-        
-        #*
-        #* END FOR LOOP
-        #*##############
-
-        return batch_array_5d
-    
-    elif (len(python_list[0].shape) == 2):
-
-        # Create empty array with shape '(num_batches, x_coord, y_coord, label)'
-        # The idea is to work with a numpy array where dimensions correspond to '(num_batches, (x, y, label))'
-        batch_array_3d = np.zeros((len(python_list), python_list[0].shape[0], python_list[0].shape[1]))
-
-        #*############################################################
-        #* FOR LOOP ITERATES OVER ALL ELEMENTS IN THE INPUT LIST
-        #* AND STACK THEM IN THE TEMPORARY ARRAY
-        #*
-        i = 0
-        for element in python_list:
-
-            # Save inside the 'patches' variable each small 3D patch of size "number of bands" x "patch_size" x "patch_size"
-            # Use 'self.cube' attribute which contains the 'preProcessed' image. From the 'preProcessed' image extract small patches
-            # from the coordenates extracted.
-            batch_array_3d[i, :, :] = element
-            i += 1
-        
-        #*
-        #* END FOR LOOP
-        #*##############
-        
-        return batch_array_3d
-    #*
-    #* END OF IF ELSE
-    #*###############################################
-
-#*
-#*#### Reshape list to numpy method #####
-#*#######################################
 
 # todo: Define method to load raw images ('.tif') // load_patient_rawImages()
 # ? Maybe create a new class?
