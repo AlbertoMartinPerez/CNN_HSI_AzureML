@@ -51,6 +51,9 @@ batch_size = 16
 # K_folds
 k_folds = 5
 
+# Learning rate
+lr = 0.01
+
 #*####################
 #* LOAD TRAIN IMAGES
 print("\n##########")
@@ -128,104 +131,18 @@ if ( batch_dim == '2D' ):
     model = models.FourLayerNet(D_in = cm_train.data.shape[-1], H = 16, D_out = cm_train.numUniqueLabels)
 
     # Train FourLayerNet model
-    model.trainNet(batch_x = data_tensor_batch, batch_y = labels_tensor_batch, epochs = epochs, plot = True, lr = 0.01)
+    model.trainNet(batch_x = data_tensor_batch, batch_y = labels_tensor_batch, epochs = epochs, plot = True, lr = lr)
 
 elif ( batch_dim == '3D' ):
 
-    print("\tSplitting data before performing K-fold double-cross validation...")
-    test_data_folds, test_label_folds, calibration_data_folds, calibration_label_folds, validation_data_folds, validation_label_folds  = hsi_dm.kfold_double_cv_split(batch_data=batches_train['cube'], batch_labels=batches_train['label'], k_folds=k_folds)
+    # Create a CrossValidator instance
+    cv = hsi_dm.CrossValidator(batch_data=batches_train['cube'], batch_labels=batches_train['label'], k_folds=k_folds, numUniqueLabels=cm_train.numUniqueLabels, numBands=cm_train.numBands, epochs=epochs, lr=lr)
 
-    print("\tData has been splitted. Performing ", k_folds ,"fold double-cross validation...")
+    # Perform K-fold double-cross validation
+    cv.double_cross_validation()
 
-    # todo: STRUCTURE TO PERFORM DOUBLE_CROSS_VALIDATION()
-    print('\n\t### DOUBLE-CROSS VALIDATION ###')
-    
-    #*###############################################################
-    #* FOR ITERATION FOR THE OUTER DOUBLE-CROSS VALIDATION LOOP (K)
-    #*
-    best_K_OACC = 0
-    Kn = 0
-
-    for K in range(0, k_folds, 1):
-        print('\n\t\t Current K fold =', K+1)
-
-        #*################################################################
-        #* FOR ITERATION FOR THE INNER DOUBLE-CROSS VALIDATION LOOP (Kn)
-        #*
-        best_Kn_OACC = 0
-        
-        for _ in range(0, k_folds, 1):
-            print('\t\t\t Current Kn fold =', Kn+1)
-            
-            # Create a Conv2DNet model. We need to define a new one for every Kn iteration
-            model = models.Conv2DNet(num_classes = cm_train.numUniqueLabels, in_channels = cm_train.numBands)
-
-            # Convert calibration data to tensor
-            batch_x = torch.from_numpy(calibration_data_folds[Kn]).type(torch.float)
-            batch_y = torch.from_numpy(calibration_label_folds[Kn]).type(torch.LongTensor)
-
-            # Train CNN in current Kn fold using the calibration data
-            model.trainNet(batch_x = batch_x, batch_y = batch_y, epochs = epochs, plot = False, lr = 0.01)
-
-            # Convert validation data to tensor
-            batch_x_val = torch.from_numpy(validation_data_folds[Kn]).type(torch.float)
-
-            # Test CNN in current Kn fold using the validation data
-            y_hat_Kn = model.predict(batch_x = batch_x_val)
-
-            # Manipulate 'validation_label_folds' for the current 'Kn'.
-            # We first need to concatenate all batches together with 'np.concatenate()' along the rows (axis=0)
-            # Then we extract the labels and not the coordenates (remember that '_labels_folds' variables have (x_coord, y_coord, label)).
-            # Since the result is of shape (N,) and the shape of 'y_hat_Kn' is (N, 1), we need to reshape (-1 indicates to take the entire lenght)
-            # We convert it as integers since they originally are floats and we need the labels as indexes inside 'get_metrics()'
-            y_true_Kn = np.concatenate(validation_label_folds[Kn], axis = 0)[:, -1].reshape((-1,1)).astype(int)
-
-            # Evaluate metrics by comparing the predicted labels with the true labels for the current Kn fold
-            Kn_OACC = mts.get_metrics(y_true_Kn, y_hat_Kn, cm_train.numUniqueLabels)['OACC']
-
-            if (best_Kn_OACC < Kn_OACC):
-                print('\t\t\t Found new best model!')
-                best_Kn_OACC = Kn_OACC
-
-                # Save Kn CNN model in local variable
-                best_Kn_model = model
-            
-            Kn += 1
-        #*
-        #* END OF INNER DOUBLE-CROSS VALIDATION LOOP (Kn)
-        #*################################################
-
-        # Convert test data to tensor
-        batch_x_test = torch.from_numpy(test_data_folds[K]).type(torch.float)
-
-        # Test 'best_Kn_model' with current K test batch
-        y_hat_K = best_Kn_model.predict(batch_x = batch_x_test)
-
-        # Manipulate 'validation_label_folds' for the current 'Kn'.
-        # We first need to concatenate all batches together with 'np.concatenate()' along the rows (axis=0)
-        # Then we extract the labels and not the coordenates (remember that '_labels_folds' variables have (x_coord, y_coord, label)).
-        # Since the result is of shape (N,) and the shape of 'y_hat_Kn' is (N, 1), we need to reshape (-1 indicates to take the entire lenght)
-        # We convert it as integers since they originally are floats and we need the labels as indexes inside 'get_metrics()'
-        y_true_K = np.concatenate(test_label_folds[K], axis = 0)[:, -1].reshape((-1,1)).astype(int)
-
-        # Evaluate metrics by comparing the predicted labels with the true labels for the current K fold
-        # Use the last column of labels since is the one containing the labels (others has coordenates)
-        K_OACC = mts.get_metrics(y_true_K, y_hat_K, cm_train.numUniqueLabels)['OACC']
-
-        if (best_K_OACC < K_OACC):
-            print('\t\t Found new best model!')
-            best_K_OACC = K_OACC
-
-            # Save K CNN model
-            best_K_model = best_Kn_model
-            
-    #*
-    #* END OF OUTER DOUBLE-CROSS VALIDATION LOOP (Kn)
-    #*#################################################
-
-    # todo: Method to save CNN model in storage
-
-print('\n\t### DOUBLE-CROSS VALIDATION IS FINISHED ###')
+    # Save in 'model' the best model obtained from the double-cross validation
+    model = cv.bestModel
 
 #*###################
 #* LOAD TEST IMAGES
@@ -264,8 +181,8 @@ if ( batch_dim == '2D' ):
     # Predict with the FourLayerNet model
     pred_labels = model.predict(batch_x = data_tensor_batch_test)
 elif ( batch_dim == '3D' ):
-    print(best_K_model)
-    pred_labels = best_K_model.predict(batch_x = data_tensor_batch_test)
+    print(model)
+    pred_labels = model.predict(batch_x = data_tensor_batch_test)
 
 #*##############################################
 #* COMPUTE METRICS WITH THE MODEL PREDICTION
