@@ -865,7 +865,7 @@ class CubeManager:
             # Return the index label containing the largest amount of elements 
             label_index = (np.where(temp_labels == np.amax(temp_labels))[0])
 
-            return np.unique(self.appended_gtMaps)[1::][label_index]
+            return np.asscalar(np.unique(self.appended_gtMaps)[1::][label_index])   # We need to use np.asscalar() because we want to retrieve the numpy scalar as a Python scalar.
         #*
         #* END OF IF ELSE
         #*################
@@ -1161,7 +1161,8 @@ class CubeManager:
                     #	> y[sample_indices] --> y coordenate of label 'label' pixel 
                     # 	> np.ones(x[sample_indices].shape[0],)*label --> creates a vector with the same lenght as the number of sampled pixels of label 'l'.
                     #										  This vector does not contain 1s but the actual value of the label!
-                    list_label_samples.append(np.array([x[sample_indices], y[sample_indices], np.ones(x[sample_indices].shape[0],)*label]).transpose())
+                    label4Class = self.__label_2_label4Class(label)     # Convert 'label' to a 'label4Class' to properly create batches and feed CNN with labels starting at 1
+                    list_label_samples.append(np.array([x[sample_indices], y[sample_indices], np.ones(x[sample_indices].shape[0],)*label4Class], dtype=int).transpose())
                     list_cube_samples.append(self.__get_patches(x[sample_indices], y[sample_indices]))
 
                     # Delete from the ground truth the pixel coordenates that have been used to create the patches
@@ -1196,7 +1197,8 @@ class CubeManager:
                 sample_indices_temp = np.random.choice(len(x_temp), samples_to_add, replace=False)
 
                 # Store in the Python list all randomly selected samples and labels from the current label and the additional samples from the 'largest label' 
-                single_label_batch = np.vstack([single_label_batch, np.array([x_temp[sample_indices_temp], y_temp[sample_indices_temp], np.ones(x_temp[sample_indices_temp].shape[0],)*largest_label]).transpose()])
+                label4Class = self.__label_2_label4Class(largest_label)     # Convert 'largest_label' to a 'label4Class' to properly create batches and feed CNN with labels starting at 1
+                single_label_batch = np.vstack([single_label_batch, np.array([x_temp[sample_indices_temp], y_temp[sample_indices_temp], np.ones(x_temp[sample_indices_temp].shape[0],)*label4Class], dtype=int).transpose()])
                 single_cube_batch = np.vstack([single_cube_batch, self.__get_patches(x_temp[sample_indices_temp], y_temp[sample_indices_temp])])
 
                 # Delete from the ground truth the pixel coordenates that have been used to create the patches
@@ -1433,8 +1435,8 @@ class CubeManager:
 #*#### CubeManager class  #####
 #*#############################
 
-#*#########################################
-#*#### Single-cross validation method #####
+#*##################################################
+#*#### kfold_double_cv_split validation method #####
 #*
 
 # todo: (Optional) modify the method to work with 2D batches (AT THE MOMENT ONLY WORK WITH 3D BATCHES)
@@ -1529,8 +1531,8 @@ def kfold_double_cv_split(batch_data, batch_labels, k_folds = 5):
     return test_data_folds, test_label_folds, calibration_data_folds, calibration_label_folds, validation_data_folds, validation_label_folds 
 
 #*
-#*#### Single-cross validation method #####
-#*#########################################
+#*#### kfold_double_cv_split validation method #####
+#*##################################################
 
 
 #*#######################################
