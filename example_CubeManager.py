@@ -2,6 +2,7 @@
 # DESCRIPTION OF THIS SCRIPT:
 # Basic script to learn how to use the 'CubeManager' class from 'hsi_dataManager.py' file.
 #-----------------------------------------------------------------------------------------------------
+# todo: UPDATE THIS LIST!
 # It demonstrates:
 #   1) How to create a CubeManager instance
 #   2) How to load '_dataset.mat' files to the CubeManager instance for training
@@ -43,10 +44,13 @@ dic_label = {'101': 1, '200': 2, '220': 2, '221': 2, '301': 3, '302': 4, '320': 
 batch_dim = '3D'
 
 # Number of epochs
-epochs = 10
+epochs = 100
 
 # Batch size
 batch_size = 16
+
+# Patch size (recommended to be always odd)
+patch_size = 7
 
 # K_folds
 k_folds = 5
@@ -60,7 +64,7 @@ print("\n##########")
 print("Loading training images. Please wait...")
 
 # Create an instance of 'CubeManager'
-cm_train = hsi_dm.CubeManager(patch_size = 7, batch_size = batch_size, dic_label = dic_label, batch_dim = batch_dim)
+cm_train = hsi_dm.CubeManager(patch_size = patch_size, batch_size = batch_size, dic_label = dic_label, batch_dim = batch_dim)
 
 # Load all desired pixels to the 'CubeManager' instance 'cm_train' (all data is stored inside the instance attributes)
 cm_train.load_patient_cubes(patients_list_train, dir_gtMaps, dir_preProImages)
@@ -150,7 +154,7 @@ print("\n##########")
 print("Loading test image. Please wait...")
 
 # Create an instance of 'CubeManager'
-cm_test = hsi_dm.CubeManager(patch_size = 7, batch_size = 64, dic_label = dic_label, batch_dim = batch_dim)
+cm_test = hsi_dm.CubeManager(patch_size = patch_size, batch_size = batch_size, dic_label = dic_label, batch_dim = batch_dim)
 
 # Load all desired pixels to the 'CubeManager' instance 'cm_test' (all data is stored inside the instance attributes)
 cm_test.load_patient_cubes(patients_list = patient_test, dir_path_gt = dir_gtMaps, dir_par_preProcessed = dir_preProImages)
@@ -181,7 +185,7 @@ if ( batch_dim == '2D' ):
     # Predict with the FourLayerNet model
     pred_labels = model.predict(batch_x = data_tensor_batch_test)
 elif ( batch_dim == '3D' ):
-    print(model)
+    # Predict with the Conv2DNet model
     pred_labels = model.predict(batch_x = data_tensor_batch_test)
 
 #*##############################################
@@ -242,6 +246,28 @@ if ( batch_dim == '3D' ):
 
     # Generate classification map from the predicted labels
     mts.get_classification_map(pred_labels, true_labels, label_coordenates, dims, title="Test classification Map", plot = True, save_plot = False, save_path = None, plot_gt = True)
+
+#*######################################################
+#* PREDICT WITH THE MODEL THE ENTIRE PREPROCESSED CUBE
+
+print("\n##########")
+print("Predicting the entire preProcessed cube...")
+
+if ( batch_dim == '3D' ):
+    # Generate batches for the entire preProcessed cube
+    cube_batch = cm_test.create_cube_batch()
+
+    # Convert 'cube' batches to PyTorch tensors for training our Neural Network
+    cube_tensor_batch = cm_test.batch_to_tensor(cube_batch['data'], data_type = torch.float)
+
+    # Obtain 'cube' batches coordenates
+    cube_coordenates = cm_test.concatenate_list_to_numpy(cube_batch['coords']).astype(int)
+
+    # Predict with the Conv2DNet model
+    pred_labels = model.predict(batch_x = cube_tensor_batch)
+
+    # Generate classification map from the predicted labels
+    mts.get_classification_map(pred_labels=pred_labels, true_labels=None, coordenates=cube_coordenates, dims=dims, title="Test Cube classification Map", plot = True, save_plot = False, save_path = None, plot_gt = False)
 
 #*#### END MAIN PROGRAM #####
 #*###########################
