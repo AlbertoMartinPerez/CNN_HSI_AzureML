@@ -128,7 +128,7 @@ def __class_metrics(confusion_mx):
 
 	return sensivity, specifity, accuracy, precission
 
-def get_classification_map(pred_labels, true_labels, coordenates, dims, title= None, plot = True, save_plot = False, save_path = None, plot_gt = True):
+def get_classification_map(pred_labels, true_labels=None, coordenates=None, dims=None, title= None, plot = True, save_plot = False, save_path = None, plot_gt = True):
 	"""
 	Generates classification maps from the input labels.
 	It can generate:
