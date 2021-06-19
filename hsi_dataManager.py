@@ -414,7 +414,7 @@ class CubeManager:
     #*##########################
     #*#### DEFINED METHODS #####
     #*
-    def __init__(self, patch_size = 7, batch_size = 64, dic_label = None, batch_dim = '2D'):
+    def __init__(self, patch_size = 7, batch_size = 16, dic_label = None, batch_dim = '2D'):
         """
         Define the constructor of 'CubeManager' class. It only works with '_cropped_Pre-processed.mat' files (GT and preProcessedImages).
 
@@ -1253,6 +1253,134 @@ class CubeManager:
         """
 
         return {'cube': list_cube_batch, 'label': list_labels_batch}
+
+    def create_cube_batch(self):
+        """
+        """
+        #*################
+        #* ERROR CHECKER
+        #*
+        if not (len(self.patients_list) == 1):
+            raise RuntimeError("'patients_list' contains more than 1 ID. Please, create a new instance of CubeManager and load only 1 image to batch its HSI cube.")
+        #*
+        #* ERROR CHECKER
+        #*################
+
+        # Create a copy of the entire HSI padded cube from the loaded patient image
+        cube = np.copy(self.patient_cubes[self.patients_list[0]]['pad_preProcessedImage'])
+        gt = np.copy(self.patient_cubes[self.patients_list[0]]['raw_groundTruthMap'])
+        
+        # Create mask of 1s with same dimension as the loaded ground truth map
+        mask = np.ones( (gt.shape[0], gt.shape[1]) )
+
+        # Create empty Python lists to append all batches with 3D patches
+        list_cube_batch = []
+        list_coords_batch = []
+
+        #*###############################################
+        #* WHILE LOOP CREATES 1 BATCH EVERY ITERATION
+        #*
+        while np.sum(mask > 0) >= self.batch_size:                # Stay in this while loop if the number of samples left in 'dataTemp' is equal or greater than 'bath_size'
+            
+            list_cube_samples = []                                       # Create empty Python list to append data cube samples
+            list_coord_samples = []                                      # Create empty Python list to append data ground truth map label samples
+
+            # Extract the coordenates from all pixels left
+            x, y = np.nonzero(mask == 1)
+
+            # From all pixels left, extract 'self.batch_size' random coordenates without replacement
+            indices = np.random.choice(len(x), self.batch_size, replace=False)
+
+            # Create a numpy array with the coordenates for the sampled indices and append to the list.
+            list_coord_samples.append( np.array([x[indices], y[indices]]).transpose() )
+
+            # Generate 3D patches from the extract coordenates using the patient HSI cube
+            # Since the mask does not have the padding, we have to add the pad_margin when accessing the cube
+            # since the cube has padding.
+            list_cube_samples.append( self.__get_patches_full_cube(x[indices] + self.pad_margin, y[indices] + self.pad_margin, cube) )
+
+            # Delete from the mask the used coordenates to create the patches
+            mask[x[indices],y[indices]] = 0
+
+            # Convert both Python lists 'list_cube_samples' and 'list_coord_samples' to numpy arrays by using 'np.concatenate()'.
+            # This way we concatenate all pixels from all labels to be stored in 1 single variable, which would represent 1 single batch
+            cube_batch = np.concatenate(list_cube_samples, axis=0)
+            coords_batch = np.concatenate(list_coord_samples, axis=0)
+
+            # Append each batch to its corresponding list
+            list_cube_batch.append(cube_batch)
+            list_coords_batch.append(coords_batch)
+        #*
+        #* END OF WHILE 
+        #*################
+
+        #*########################################################
+        #* IF STATEMENT IS USED TO APPEND THE REMAINING DATA 
+        #* THAT CAN NOT BE USED AS A BATCH OF 'batch_size' SIZE
+        #*
+        if ( mask[mask > 0].shape[0] / self.batch_size > 0):
+
+            # Extract the coordenates for the remaining left pixels in the mask
+            x, y = np.nonzero(mask != 0)
+            
+            # Create a numpy array with the coordenates for the sampled indices and append to the list
+            list_coords_batch.append(np.array([x, y]).transpose())
+
+            # Generate 3D patches from the extract coordenates using the patient HSI cube.
+            # Since the mask does not have the padding, we have to add the pad_margin when accessing the cube
+            # since the cube has padding.
+            list_cube_batch.append(self.__get_patches_full_cube(x + self.pad_margin, y + self.pad_margin, cube))
+
+        #*   
+        #* END OF IF
+        #*##############
+
+        return {'data': list_cube_batch, 'coords': list_coords_batch}
+
+    def __get_patches_full_cube(self, x, y, cube):
+        """
+        (Private method) Create 3D patches using the input coordenates and extract data from the entire
+        preprocessed cube passed as input. 
+        
+        Inputs
+        ----------
+        - 'x' and 'y':  Coordenates to access the input 'cube' and use them as center coordenates
+                        for the patches.
+        - 'cube':       Numpy array. Preprocessed cube with already added padding.
+
+        Outputs
+        ----------
+        - 'patches':    Numpy array with all generated patches from the centered coordenates passed as inputs.
+        """
+    
+        # Create empty 'len(x)' arrays (or patches) with size: "number of bands" x "patch_size" x "patch_size" 
+        patches = np.zeros((len(x), cube.shape[-1], self.patch_size, self.patch_size))
+
+		# Extract start coordenates for 'x' and 'y' Python lists passed as parameter 
+        xs = (x - int(self.patch_size/2)).astype(int)
+        ys = (y - int(self.patch_size/2)).astype(int)
+
+		# Extract end coordenates for 'x' and 'y' Python lists passed as parameter
+        xe = xs + self.patch_size
+        ye = ys + self.patch_size
+
+        #*############################################################
+        #* FOR LOOP ITERATES OVER ALL PASSED PIXEL COORDENATES TO 
+        #* GENERATE PATCHES FROM THE HSI CUBES AND SAVE THEM IN
+        #* THE 'patches' VARIABLE.
+        #*
+        for i in range(len(x)):
+            # Save inside the 'patches' variable each small 3D patch of size "number of bands" x "patch_size" x "patch_size"
+		    # Use 'self.cube' attribute which contains the 'preProcessed' image. From the 'preProcessed' image extract small patches
+		    # from the coordenates extracted.
+            patches[i,:,:,:] = np.transpose(cube[xs[i]:xe[i], ys[i]:ye[i], :], (2, 0, 1) )
+
+        #*
+        #* END FOR LOOP
+        #*##############
+
+        return patches
+
 
     def __get_patches(self, x, y):
         """
