@@ -26,10 +26,10 @@ import numpy as np                  # Import Numpy as np
 #*
 
 # Desired patient images ID
-# ['ID0018C09', 'ID0025C02', 'ID0029C02', 'ID0030C02', 'ID0033C02', 'ID0034C02', 'ID0035C02', 'ID0038C02', 'ID0047C02', 'ID0047C08', 'ID0050C05', 'ID0051C05', 'ID0056C02', 'ID0064C04',
-# 'ID0064C06', 'ID0065C01', 'ID0065C09', 'ID0067C01', 'ID0068C08', 'ID0070C02', 'ID0070C05', 'ID0070C08', 'ID0071C02', 'ID0071C011', 'ID0071C014']
-patients_list_train = ['ID0018C09', 'ID0025C02']
-patient_test = ['ID0038C02']
+# ['ID0018C09', 'ID0025C02', 'ID0029C02', 'ID0030C02', 'ID0033C02', 'ID0034C02', 'ID0035C02', 'ID0038C02', 'ID0047C02', 'ID0047C08', 'ID0050C05', 'ID0051C05', 'ID0056C02',
+# 'ID0064C04', 'ID0064C06', 'ID0065C01', 'ID0065C09', 'ID0067C01', 'ID0068C08', 'ID0070C02', 'ID0070C05', 'ID0070C08', 'ID0071C02', 'ID0071C011', 'ID0071C014']
+patients_list_train = ['ID0018C09', 'ID0025C02', 'ID0029C02', 'ID0033C02', 'ID0034C02', 'ID0038C02', 'ID0047C02', 'ID0047C08', 'ID0050C05', 'ID0051C05', 'ID0056C02']
+patient_test = ['ID0029C02']
 
 # Directories with data
 dir_datasets = "NEMESIS_images/datasets/"
@@ -44,7 +44,7 @@ dic_label = {'101': 1, '200': 2, '220': 2, '221': 2, '301': 3, '302': 4, '320': 
 batch_dim = '3D'
 
 # Number of epochs
-epochs = 100
+epochs = 1
 
 # Batch size
 batch_size = 16
@@ -53,7 +53,7 @@ batch_size = 16
 patch_size = 7
 
 # K_folds
-k_folds = 5
+k_folds = 2
 
 # Learning rate
 lr = 0.01

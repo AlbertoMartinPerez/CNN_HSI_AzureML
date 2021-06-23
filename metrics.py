@@ -134,6 +134,7 @@ def get_classification_map(pred_labels, true_labels=None, coordenates=None, dims
 	It can generate:
 	- Single plot with the predicted classification map.
 	- A subplot with the original ground-truth and the predicted ground-truth.
+	- Single plot with the predicted classification map from an entire cube.
 
     Inputs
     ----------

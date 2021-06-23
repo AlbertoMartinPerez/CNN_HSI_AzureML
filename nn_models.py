@@ -279,13 +279,6 @@ class Conv2DNet(nn.Module):
         ----------
         - 'num_classes':    (int) Number of unique labels to classify in the training data.
         - 'in_channels':    (int) Number of channels in the input image.
-
-        , out_channels, kernel_size, stride = 1, padding = 0)
-
-        - 'out_channels':   (int) Number of channels produced by the convolution.
-        - 'kernel_size':    (int or tuple) Size of the convolving kernel.
-        - 'stride':         (int or tuple) Stride of the convolution.
-        - 'padding':        (int or tuple) Zero-padding added to both sides of the input.
         """
 
         super(Conv2DNet, self).__init__()
