@@ -128,7 +128,7 @@ def __class_metrics(confusion_mx):
 
 	return sensivity, specifity, accuracy, precission
 
-def get_classification_map(pred_labels, true_labels=None, coordenates=None, dims=None, title= None, plot = True, save_plot = False, save_path = None, plot_gt = True):
+def get_classification_map(pred_labels, true_labels=None, coordenates=None, dims=None, title= None, plot = True, save_plot = False, save_path = None, plot_gt = True, padding = 0):
 	"""
 	Generates classification maps from the input labels.
 	It can generate:
@@ -147,6 +147,7 @@ def get_classification_map(pred_labels, true_labels=None, coordenates=None, dims
     - 'save_plot':		Boolean flag to indicate whether or not to save the plot
     - 'save_path':		String variable containing the path to save the subplot
 	- 'plot_gt':		Boolean flag to indicate whether or not
+	- 'padding':		Integer. Value used to pad images to generate the batches. Used to delete empty rows and columns for the bottom and right.
     """
 	#*################
     #* ERROR CHECKER
@@ -188,6 +189,9 @@ def get_classification_map(pred_labels, true_labels=None, coordenates=None, dims
 	# Convert the raw map with labels to color maps
 	preds_color =  convert2color(pred_raw_map)
 
+	# Delete added padding to the right and bottom
+	preds_color = preds_color[0:preds_color.shape[0]-2*padding, 0:preds_color.shape[1]-2*padding]
+
 	# Plot prediction map
 	if plot:
 		fig = plt.figure()
@@ -207,6 +211,9 @@ def get_classification_map(pred_labels, true_labels=None, coordenates=None, dims
 		# Convert the raw map with labels to color maps
 		gt_color = convert2color(gt_raw_map)
 
+    	# Delete added padding to the right and bottom
+		gt_color = gt_color[0:gt_color.shape[0]-2*padding, 0:gt_color.shape[1]-2*padding]
+		
 		# Plot the prediction map and the ground truth map
 		if plot:
 			fig = plt.figure()
