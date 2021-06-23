@@ -2,5 +2,7 @@ NEMESIS_images/
 .vscode/
 __pycache__/
 scripts_guille/
+Azure_Machine_Learning_Notebooks/
 experiment_1.py
 temp.py
+config.json
