@@ -19,7 +19,6 @@ import torch                        # Import PyTorch
 import hsi_dataManager as hsi_dm    # Import 'hsi_dataManager.py' file as 'hsi_dm' to load use all desired functions 
 import nn_models as models          # Import 'nn_models.py' file as 'models' to define any new Neural Network included in the file 
 import metrics as mts               # Import 'metrics.py' file as 'mts' to evluate metrics
-import numpy as np                  # Import Numpy as np
 
 #*#############################
 #*#### START MAIN PROGRAM #####
@@ -28,8 +27,8 @@ import numpy as np                  # Import Numpy as np
 # Desired patient images ID
 # ['ID0018C09', 'ID0025C02', 'ID0029C02', 'ID0030C02', 'ID0033C02', 'ID0034C02', 'ID0035C02', 'ID0038C02', 'ID0047C02', 'ID0047C08', 'ID0050C05', 'ID0051C05', 'ID0056C02',
 # 'ID0064C04', 'ID0064C06', 'ID0065C01', 'ID0065C09', 'ID0067C01', 'ID0068C08', 'ID0070C02', 'ID0070C05', 'ID0070C08', 'ID0071C02', 'ID0071C011', 'ID0071C014']
-patients_list_train = ['ID0018C09', 'ID0025C02', 'ID0029C02', 'ID0033C02', 'ID0034C02', 'ID0038C02', 'ID0047C02', 'ID0047C08', 'ID0050C05', 'ID0051C05', 'ID0056C02']
-patient_test = ['ID0029C02']
+patients_list_train = ['ID0030C02', 'ID0033C02', 'ID0035C02']#, 'ID0034C02', 'ID0038C02', 'ID0047C02', 'ID0047C08', 'ID0050C05', 'ID0051C05', 'ID0056C02']
+patient_test = ['ID0033C02']
 
 # Directories with data
 dir_datasets = "NEMESIS_images/datasets/"
@@ -38,7 +37,7 @@ dir_preProImages = "NEMESIS_images/preProcessedImages/"
 dir_rawImages = "NEMESIS_images/tif/"
 
 # Python dictionary to convert labels to label4Classes
-dic_label = {'101': 1, '200': 2, '220': 2, '221': 2, '301': 3, '302': 4, '320': 5, '331': 6}
+dic_label = {'101': 1, '200': 2, '220': 2, '221': 2, '301': 3, '302': 4, '320': 5}
 
 # Determine dimension of batches for the Neural Network
 batch_dim = '3D'
@@ -242,10 +241,10 @@ if ( batch_dim == '3D' ):
     label_coordenates = cm_test.concatenate_list_to_numpy(batches_test['label'])[:, 0:-1].astype(int)
 
     # Extract dimension of the loaded groundTruthMap for the test patient
-    dims = cm_test.patient_cubes[patient_test[0]]['raw_groundTruthMap'].shape
+    dims = cm_test.patient_cubes[patient_test[0]]['pad_groundTruthMap'].shape
 
     # Generate classification map from the predicted labels
-    mts.get_classification_map(pred_labels, true_labels, label_coordenates, dims, title="Test classification Map", plot = True, save_plot = False, save_path = None, plot_gt = True)
+    mts.get_classification_map(pred_labels, true_labels, label_coordenates, dims = dims, title="Test classification Map", plot = True, save_plot = False, save_path = None, plot_gt = True, padding=cm_test.pad_margin)
 
 #*######################################################
 #* PREDICT WITH THE MODEL THE ENTIRE PREPROCESSED CUBE
@@ -267,7 +266,7 @@ if ( batch_dim == '3D' ):
     pred_labels = model.predict(batch_x = cube_tensor_batch)
 
     # Generate classification map from the predicted labels
-    mts.get_classification_map(pred_labels=pred_labels, true_labels=None, coordenates=cube_coordenates, dims=dims, title="Test Cube classification Map", plot = True, save_plot = False, save_path = None, plot_gt = False)
+    mts.get_classification_map(pred_labels=pred_labels, true_labels=None, coordenates=cube_coordenates, dims=dims, title="Test Cube classification Map", plot = True, save_plot = False, save_path = None, plot_gt = False, padding=cm_test.pad_margin)
 
 #*#### END MAIN PROGRAM #####
 #*###########################

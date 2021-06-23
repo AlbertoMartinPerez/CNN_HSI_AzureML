@@ -545,7 +545,8 @@ class CubeManager:
             # Extract all the coordenates for the 'label' available in the Ground Truth.
             # np.nonzero() returns a tuple of arrays, one for each dimension of gt_map == label.
             x, y = np.nonzero(gt_map == label)
-
+            
+            """
             #*############################################################
             #* IF STATEMENT TO CHECK IF BATCHES ARE '3D' AND NEED TO USE
             #* THE PADDED GROUND-TRUTH MAP 
@@ -558,6 +559,7 @@ class CubeManager:
             #*
             #* END OF IF
             #*############
+            """
 
             # Call private method to generate dataset from the passed cube
             self.__get_dataset_from_cube(preProcessedImage, x, y, label, patientNum)
@@ -773,7 +775,7 @@ class CubeManager:
             if ( temp_gt_map.shape[-1] < self.max_padded_width):
                 # Calculate the padding to add (so that we can append all ground-truth maps with same width)
                 padding = self.max_padded_width - temp_gt_map.shape[-1]
-                # Add padding to the current ground-truth map and preProcessedImage to the right of the array
+                # Add padding to the current ground-truth map and preProcessedImage to the right of the array  (to increase the width)
                 temp_preProcessedImage = np.pad(temp_preProcessedImage, [(0, 0), (0, padding), (0,0)], 'constant')
                 temp_gt_map = np.pad(temp_gt_map, [(0, 0), (0, padding)] , 'constant')
             #*
@@ -1380,7 +1382,6 @@ class CubeManager:
         #*##############
 
         return patches
-
 
     def __get_patches(self, x, y):
         """
