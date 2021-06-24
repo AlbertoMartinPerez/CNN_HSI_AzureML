@@ -20,6 +20,51 @@ import hsi_dataManager as hsi_dm    # Import 'hsi_dataManager.py' file as 'hsi_d
 import nn_models as models          # Import 'nn_models.py' file as 'models' to define any new Neural Network included in the file 
 import metrics as mts               # Import 'metrics.py' file as 'mts' to evluate metrics
 
+# Import Azure SKD for Python packages
+import azureml.core
+from azureml.core import Workspace, Dataset
+
+import os                                   # To extract path directory
+
+#*#########################
+#* DEFINED AZURE FUNCTIONS
+#*
+def azure_path_files():
+    # Load the workspace from the saved config file
+    ws = Workspace.from_config()
+    print('Ready to use Azure ML {} to work with {}'.format(azureml.core.VERSION, ws.name))
+
+    # Get the default datastore
+    default_ds = ws.get_default_datastore()
+
+    # A dataset is used to reference the data you uploaded to Azure Blob Storage.
+    # Datasets are an abstraction layer on top of your data that are designed to improve reliability and trustworthiness.
+    # From the default datastore, we want to extract the uploaded file (.mat) available in the Azure Blob Storage
+    # The path of the file should be the one available in the Azure Blob Container directory and not the one created locally on Azure Machine Learning > Author > Notebooks
+    # Dataset.File.from_files() returns a 'FileDataset' object.
+
+    #Create a file dataset from the path on the datastore (this may take a short while) for the Ground Truth Maps
+    files_gt = Dataset.File.from_files(path=(default_ds, 'NEMESIS_images/GroundTruthMaps/*.mat'))
+
+    # Download file paths available in the connected Azure Blob Storage.
+    # It returns an array with all file paths downloaded locally in a temp folder.
+    arrayDataset_gt = files_gt.download()
+
+    gt_path = os.path.dirname(arrayDataset_gt[0])
+    gt_path = gt_path + '\\'
+        
+    #Create a file dataset from the path on the datastore (this may take a short while) for the preProcessedImages
+    files_preProcessed = Dataset.File.from_files(path=(default_ds, 'NEMESIS_images/preProcessedImages/*.mat'))
+
+    # Download file paths available in the connected Azure Blob Storage.
+    # It returns an array with all file paths downloaded locally in a temp folder.
+    arrayDataset_preProcessed = files_preProcessed.download()
+
+    preProcessed_path = os.path.dirname(arrayDataset_preProcessed[0])
+    preProcessed_path = preProcessed_path + '\\'
+
+    return gt_path, preProcessed_path
+
 #*#############################
 #*#### START MAIN PROGRAM #####
 #*
@@ -27,14 +72,20 @@ import metrics as mts               # Import 'metrics.py' file as 'mts' to evlua
 # Desired patient images ID
 # ['ID0018C09', 'ID0025C02', 'ID0029C02', 'ID0030C02', 'ID0033C02', 'ID0034C02', 'ID0035C02', 'ID0038C02', 'ID0047C02', 'ID0047C08', 'ID0050C05', 'ID0051C05', 'ID0056C02',
 # 'ID0064C04', 'ID0064C06', 'ID0065C01', 'ID0065C09', 'ID0067C01', 'ID0068C08', 'ID0070C02', 'ID0070C05', 'ID0070C08', 'ID0071C02', 'ID0071C011', 'ID0071C014']
-patients_list_train = ['ID0018C09', 'ID0025C02', 'ID0029C02', 'ID0030C02', 'ID0033C02', 'ID0034C02', 'ID0035C02', 'ID0038C02', 'ID0047C02', 'ID0047C08', 'ID0050C05', 'ID0051C05', 'ID0056C02']
-patient_test = ['ID0035C02']
+patients_list_train = ['ID0030C02', 'ID0033C02', 'ID0035C02']
+patient_test = ['ID0033C02']
 
-# Directories with data
-dir_datasets = "NEMESIS_images/datasets/"
-dir_gtMaps = "NEMESIS_images/GroundTruthMaps/"
-dir_preProImages = "NEMESIS_images/preProcessedImages/"
-dir_rawImages = "NEMESIS_images/tif/"
+# Variable to indicate if using data from Azure
+useAzure = True
+
+if useAzure:
+    dir_gtMaps, dir_preProImages = azure_path_files()
+else:
+    # Directories with data
+    dir_datasets = "NEMESIS_images/datasets/"
+    dir_gtMaps = "NEMESIS_images/GroundTruthMaps/"
+    dir_preProImages = "NEMESIS_images/preProcessedImages/"
+    dir_rawImages = "NEMESIS_images/tif/"
 
 # Python dictionary to convert labels to label4Classes
 dic_label = {'101': 1, '200': 2, '220': 2, '221': 2, '301': 3, '302': 4, '320': 5}
@@ -55,7 +106,7 @@ patch_size = 7
 k_folds = 2
 
 # Learning rate
-lr = 0.0001
+lr = 0.01
 
 #*####################
 #* LOAD TRAIN IMAGES
