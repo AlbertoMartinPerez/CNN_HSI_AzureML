@@ -187,7 +187,7 @@ def get_classification_map(pred_labels, true_labels=None, coordenates=None, dims
 	pred_raw_map[x, y] = pred_labels
 
 	# Convert the raw map with labels to color maps
-	preds_color =  convert2color(pred_raw_map)
+	preds_color =  _convert2color(pred_raw_map)
 
 	# Delete added padding to the right and bottom
 	preds_color = preds_color[2*padding:preds_color.shape[0]-2*padding, 2*padding:preds_color.shape[1]-2*padding]
@@ -209,7 +209,7 @@ def get_classification_map(pred_labels, true_labels=None, coordenates=None, dims
 		gt_raw_map[x, y] = true_labels
 
 		# Convert the raw map with labels to color maps
-		gt_color = convert2color(gt_raw_map)
+		gt_color = _convert2color(gt_raw_map)
 
     	# Delete added padding to the right and bottom
 		gt_color = gt_color[2*padding:gt_color.shape[0]-2*padding, 2*padding:gt_color.shape[1]-2*padding]
@@ -232,36 +232,59 @@ def get_classification_map(pred_labels, true_labels=None, coordenates=None, dims
 	if save_plot:
 		plt.savefig(save_path + title + '_map.png', bbox_inches='tight')
 
-# TODO: Review this function before using it
-def paletteGen():
+def _paletteGen():
+    """
+	(Private method) Genereates a Python dictionary 'pallete' where each index corresponds to a label4Class color.
+	- 0 = Black
+	- 1 = Green
+	- 2 = Red
+	- 3 = Blue
+	- 4 = Cyan
+	- 5 = Magenta
+	- 6 = White
 
-	palette = {0: (0, 0, 0)}
+	Outputs
+    ----------
+	- 'pallete': Python dictionary with RGB colors por each label4Class.
+	"""
+    palette = {0: (0, 0, 0)}
 
-	palette[0] = np.asarray(np.array([0,0,0])*255,dtype='uint8')
-	palette[1] = np.asarray(np.array([0,1,0])*255,dtype='uint8')
-	palette[2] = np.asarray(np.array([1,0,0])*255,dtype='uint8')
-	palette[3] = np.asarray(np.array([0,0,1])*255,dtype='uint8')
-	palette[4] = np.asarray(np.array([0,.63,.89])*255,dtype='uint8')
-	#palette[5] = np.asarray(np.array([.49,0,1])*255,dtype='uint8')
-	palette[5] = np.asarray(np.array([1,0,1])*255,dtype='uint8')
-	palette[6] = np.asarray(np.array([1,1,1])*255,dtype='uint8')
+    palette[0] = np.asarray(np.array([0,0,0])*255,dtype='uint8')
+    palette[1] = np.asarray(np.array([0,1,0])*255,dtype='uint8')
+    palette[2] = np.asarray(np.array([1,0,0])*255,dtype='uint8')
+    palette[3] = np.asarray(np.array([0,0,1])*255,dtype='uint8')
+    palette[4] = np.asarray(np.array([0,1,1])*255,dtype='uint8')
+    #palette[5] = np.asarray(np.array([.49,0,1])*255,dtype='uint8')
+    palette[5] = np.asarray(np.array([1,0,1])*255,dtype='uint8')
+    palette[6] = np.asarray(np.array([1,1,1])*255,dtype='uint8')
 
-	return palette
+    return palette
 
-# TODO: Review this function before using it
-def convert2color(gt_raw, palette=paletteGen()):
+def _convert2color(gt_raw, palette=_paletteGen()):
+    """
+	(Private method) Convert the Ground truth map with label4Classes to a color map.
+
+	Inputs
+    ----------
+	- 'gt_raw':		Numpy array. Raw ground truth map with label4Classes.
+	- 'pallete': 	Python dictionary with RGB colors for each label4Class.
+
+	Outputs
+    ----------
+	- 'gt_color':	Numpy array with same shape as 'gt_raw' with colors for every label4Class.
+	"""
 	
-	# Create empty array to create an RGB imagen with MxMx3 dimensions
-	gt_color = np.zeros((gt_raw.shape[0], gt_raw.shape[1], 3), dtype=np.uint8)
+    # Create empty array to create an RGB imagen with MxMx3 dimensions
+    gt_color = np.zeros((gt_raw.shape[0], gt_raw.shape[1], 3), dtype=np.uint8)
 
+	# Get the key and value from the dictionary to iterate (the label4Class and its color)
+    for label4Class, color in palette.items():
+        # get mask of vals that gt == #item in palette
+        m = (gt_raw == label4Class)
+        # set color val in 3 components
+        gt_color[m] = color
 
-	for c, i in palette.items():
-		# get mask of vals that gt == #item in palette
-		m = gt_raw == c
-		# set color val in 3 components
-		gt_color[m] = i
-
-	return gt_color
+    return gt_color
 
 #*
 #*#### END DEFINED METHODS #####
