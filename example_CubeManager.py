@@ -27,8 +27,8 @@ import metrics as mts               # Import 'metrics.py' file as 'mts' to evlua
 # Desired patient images ID
 # ['ID0018C09', 'ID0025C02', 'ID0029C02', 'ID0030C02', 'ID0033C02', 'ID0034C02', 'ID0035C02', 'ID0038C02', 'ID0047C02', 'ID0047C08', 'ID0050C05', 'ID0051C05', 'ID0056C02',
 # 'ID0064C04', 'ID0064C06', 'ID0065C01', 'ID0065C09', 'ID0067C01', 'ID0068C08', 'ID0070C02', 'ID0070C05', 'ID0070C08', 'ID0071C02', 'ID0071C011', 'ID0071C014']
-patients_list_train = ['ID0030C02', 'ID0033C02', 'ID0035C02']#, 'ID0034C02', 'ID0038C02', 'ID0047C02', 'ID0047C08', 'ID0050C05', 'ID0051C05', 'ID0056C02']
-patient_test = ['ID0033C02']
+patients_list_train = ['ID0018C09', 'ID0025C02', 'ID0029C02', 'ID0030C02', 'ID0033C02', 'ID0034C02', 'ID0035C02', 'ID0038C02', 'ID0047C02', 'ID0047C08', 'ID0050C05', 'ID0051C05', 'ID0056C02']
+patient_test = ['ID0035C02']
 
 # Directories with data
 dir_datasets = "NEMESIS_images/datasets/"
@@ -55,7 +55,7 @@ patch_size = 7
 k_folds = 2
 
 # Learning rate
-lr = 0.01
+lr = 0.0001
 
 #*####################
 #* LOAD TRAIN IMAGES
