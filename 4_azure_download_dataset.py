@@ -1,7 +1,7 @@
 import azureml.core
 from azureml.core import Workspace, Dataset
 
-from scipy.io import loadmat                # To load .mat files
+import os                                   # To extract path directory
 
 
 # Load the workspace from the saved config file
@@ -20,19 +20,23 @@ default_ds = ws.get_default_datastore()
 #Create a file dataset from the path on the datastore (this may take a short while) for the Ground Truth Maps
 files_gt = Dataset.File.from_files(path=(default_ds, 'NEMESIS_images/GroundTruthMaps/*.mat'))
 
-# Download file paths available in the connected Azure Blob Storage. It returns an array with all file paths downloaded locally
+# Download file paths available in the connected Azure Blob Storage.
+# It returns an array with all file paths downloaded locally in a temp folder.
 arrayDataset_gt = files_gt.download()
 
-
-# Get the files in the dataset
-for gt in arrayDataset_gt:
-    gt_mat = loadmat(gt) 
-    print(gt_mat['groundTruthMap'].shape[1])
-    stop
-
+gt_path = os.path.dirname(arrayDataset_gt[0])
+print(gt_path)
+gt_path = gt_path + '\\'
+print(gt_path)
+    
 #Create a file dataset from the path on the datastore (this may take a short while) for the preProcessedImages
 files_preProcessed = Dataset.File.from_files(path=(default_ds, 'NEMESIS_images/preProcessedImages/*.mat'))
 
-# Get the files in the dataset
-for file_path in files_preProcessed.to_path():
-    print(file_path)
+# Download file paths available in the connected Azure Blob Storage.
+# It returns an array with all file paths downloaded locally in a temp folder.
+arrayDataset_preProcessed = files_preProcessed.download()
+
+preProcessed_path = os.path.dirname(arrayDataset_preProcessed[0])
+print(preProcessed_path)
+preProcessed_path = preProcessed_path + '\\'
+print(preProcessed_path)
