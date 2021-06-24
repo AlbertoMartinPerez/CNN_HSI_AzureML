@@ -1617,8 +1617,6 @@ class CrossValidator:
 
         self.bestModel = None
 
-
-    # todo: (Optional) modify the method to work with 2D batches (AT THE MOMENT ONLY WORK WITH 3D BATCHES)
     def __kfold_double_cv_split(self):
         """
         (Private method) Uses the K-fold cross-validator from sklearn to extracts test, calibration, and validation indexes from the input Python list.
