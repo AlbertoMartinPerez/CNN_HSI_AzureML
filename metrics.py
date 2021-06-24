@@ -190,7 +190,7 @@ def get_classification_map(pred_labels, true_labels=None, coordenates=None, dims
 	preds_color =  convert2color(pred_raw_map)
 
 	# Delete added padding to the right and bottom
-	preds_color = preds_color[0:preds_color.shape[0]-2*padding, 0:preds_color.shape[1]-2*padding]
+	preds_color = preds_color[2*padding:preds_color.shape[0]-2*padding, 2*padding:preds_color.shape[1]-2*padding]
 
 	# Plot prediction map
 	if plot:
@@ -212,7 +212,7 @@ def get_classification_map(pred_labels, true_labels=None, coordenates=None, dims
 		gt_color = convert2color(gt_raw_map)
 
     	# Delete added padding to the right and bottom
-		gt_color = gt_color[0:gt_color.shape[0]-2*padding, 0:gt_color.shape[1]-2*padding]
+		gt_color = gt_color[2*padding:gt_color.shape[0]-2*padding, 2*padding:gt_color.shape[1]-2*padding]
 		
 		# Plot the prediction map and the ground truth map
 		if plot:
