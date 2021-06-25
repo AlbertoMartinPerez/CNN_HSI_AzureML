@@ -148,7 +148,12 @@ def get_classification_map(pred_labels, true_labels=None, coordenates=None, dims
     - 'save_path':		String variable containing the path to save the subplot
 	- 'plot_gt':		Boolean flag to indicate whether or not
 	- 'padding':		Integer. Value used to pad images to generate the batches. Used to delete empty rows and columns for the bottom and right.
-    """
+    
+	Outputs
+    ----------
+	- 'preds_color':	PyPlot figure with the predicted map with colors for every label4Class.
+	- 'gt_color':		PyPlot figure with the ground-truth map with colors for every label4Class.
+	"""
 	#*################
     #* ERROR CHECKER
     #*
@@ -172,6 +177,10 @@ def get_classification_map(pred_labels, true_labels=None, coordenates=None, dims
     #* END OF ERROR CHECKER ###
     #*#########################
 
+	# Create empty variables (in case we return a figure that has not been created)
+	fig_predMap = None
+	fig_GTs = None
+
 	# Extract X and Y coordenates independently. 
 	# Extracting 1 column results in a 1D array, therefore we need to reshape 
 	# to have a (N, 1) shape and index labels to each coordenate properly.
@@ -192,12 +201,13 @@ def get_classification_map(pred_labels, true_labels=None, coordenates=None, dims
 	# Delete added padding to the right and bottom
 	preds_color = preds_color[2*padding:preds_color.shape[0]-2*padding, 2*padding:preds_color.shape[1]-2*padding]
 
+	# Create plot with figure to be returned for Azure
+	fig_predMap = plt.figure()
+	plt.title(title)
+	plt.imshow(preds_color)
+	plt.axis('off')
 	# Plot prediction map
 	if plot:
-		fig = plt.figure()
-		plt.title(title)
-		plt.imshow(preds_color)
-		plt.axis('off')
 		plt.show()
 
 	# Do the same with the ground truth labels in case we want to plot it
@@ -214,23 +224,26 @@ def get_classification_map(pred_labels, true_labels=None, coordenates=None, dims
     	# Delete added padding to the right and bottom
 		gt_color = gt_color[2*padding:gt_color.shape[0]-2*padding, 2*padding:gt_color.shape[1]-2*padding]
 		
+		# Create plot with figure to be returned for Azure
+		fig_GTs = plt.figure()
+		fig_GTs.suptitle(title)
+		fig_GTs.add_subplot(1, 2, 1)
+		plt.imshow(preds_color)
+		plt.title("Prediction")
+		plt.axis('off')
+		fig_GTs.add_subplot(1, 2, 2)
+		plt.imshow(gt_color)
+		plt.title("Ground truth")
+		plt.axis('off')
 		# Plot the prediction map and the ground truth map
 		if plot:
-			fig = plt.figure()
-			fig.suptitle(title)
-			fig.add_subplot(1, 2, 1)
-			plt.imshow(preds_color)
-			plt.title("Prediction")
-			plt.axis('off')
-			fig.add_subplot(1, 2, 2)
-			plt.imshow(gt_color)
-			plt.title("Ground truth")
-			plt.axis('off')
 			plt.show()
 
 	# Save the image
 	if save_plot:
 		plt.savefig(save_path + title + '_map.png', bbox_inches='tight')
+
+	return fig_predMap, fig_GTs
 
 def _paletteGen():
     """
