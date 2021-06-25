@@ -1,5 +1,5 @@
 import azureml.core
-from azureml.core import Workspace, Experiment, Environment, ScriptRunConfig
+from azureml.core import Workspace, Experiment
 
 #*############################
 #* CHECK AZUREML-CORE VERSION
@@ -24,13 +24,3 @@ print("Compute Resources:")
 for compute_name in ws.compute_targets:
     compute = ws.compute_targets[compute_name]
     print("\t", compute.name, ':', compute.type)
-
-#*#######################
-#* CREATE NEW EXPERIMENT
-#*
-experiment = Experiment(workspace=ws, name='exp01-Datasetmanager')
-
-run = experiment.start_logging()
-
-# Complete the run
-run.complete()
