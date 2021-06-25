@@ -22,48 +22,11 @@ import metrics as mts               # Import 'metrics.py' file as 'mts' to evlua
 
 # Import Azure SKD for Python packages
 import azureml.core
-from azureml.core import Workspace, Dataset
+from azureml.core import Workspace, Dataset, Run, Experiment
 
-import os                                   # To extract path directory
-
-#*#########################
-#* DEFINED AZURE FUNCTIONS
-#*
-def azure_path_files():
-    # Load the workspace from the saved config file
-    ws = Workspace.from_config()
-    print('Ready to use Azure ML {} to work with {}'.format(azureml.core.VERSION, ws.name))
-
-    # Get the default datastore
-    default_ds = ws.get_default_datastore()
-
-    # A dataset is used to reference the data you uploaded to Azure Blob Storage.
-    # Datasets are an abstraction layer on top of your data that are designed to improve reliability and trustworthiness.
-    # From the default datastore, we want to extract the uploaded file (.mat) available in the Azure Blob Storage
-    # The path of the file should be the one available in the Azure Blob Container directory and not the one created locally on Azure Machine Learning > Author > Notebooks
-    # Dataset.File.from_files() returns a 'FileDataset' object.
-
-    #Create a file dataset from the path on the datastore (this may take a short while) for the Ground Truth Maps
-    files_gt = Dataset.File.from_files(path=(default_ds, 'NEMESIS_images/GroundTruthMaps/*.mat'))
-
-    # Download file paths available in the connected Azure Blob Storage.
-    # It returns an array with all file paths downloaded locally in a temp folder.
-    arrayDataset_gt = files_gt.download()
-
-    gt_path = os.path.dirname(arrayDataset_gt[0])
-    gt_path = gt_path + '\\'
-        
-    #Create a file dataset from the path on the datastore (this may take a short while) for the preProcessedImages
-    files_preProcessed = Dataset.File.from_files(path=(default_ds, 'NEMESIS_images/preProcessedImages/*.mat'))
-
-    # Download file paths available in the connected Azure Blob Storage.
-    # It returns an array with all file paths downloaded locally in a temp folder.
-    arrayDataset_preProcessed = files_preProcessed.download()
-
-    preProcessed_path = os.path.dirname(arrayDataset_preProcessed[0])
-    preProcessed_path = preProcessed_path + '\\'
-
-    return gt_path, preProcessed_path
+import os                           # To extract path directory
+import joblib                       # To save trained model
+import argparse                     # To get all arguments passed to this script if using Azure
 
 #*#############################
 #*#### START MAIN PROGRAM #####
@@ -77,15 +40,6 @@ patient_test = ['ID0033C02']
 
 # Variable to indicate if using data from Azure
 useAzure = True
-
-if useAzure:
-    dir_gtMaps, dir_preProImages = azure_path_files()
-else:
-    # Directories with data
-    dir_datasets = "NEMESIS_images/datasets/"
-    dir_gtMaps = "NEMESIS_images/GroundTruthMaps/"
-    dir_preProImages = "NEMESIS_images/preProcessedImages/"
-    dir_rawImages = "NEMESIS_images/tif/"
 
 # Python dictionary to convert labels to label4Classes
 dic_label = {'101': 1, '200': 2, '220': 2, '221': 2, '301': 3, '302': 4, '320': 5}
@@ -107,6 +61,41 @@ k_folds = 2
 
 # Learning rate
 lr = 0.01
+
+if useAzure:
+
+    # Get script arguments 
+    # (file datasets mount points for gt maps and preprocessed cubes)
+    parser = argparse.ArgumentParser()
+    parser.add_argument('--input-gt-data', type=str, dest='data_folder', help='Ground truth map data mount point')
+    parser.add_argument('--input-preProcessed-data', type=str, dest='data_folder', help='Pre-processed cubes data mount point')
+    args = parser.parse_args()
+
+    # Get the experiment run context
+    run = Run.get_context()
+
+    # load the diabetes dataset
+    print("Loading Data from Azure...")
+
+    # Get the training data path from the input arguments
+    # (they will be used when creating an instance from 'CubeManager' class)
+    dir_gtMaps = run.input_datasets['gtMaps_data']
+    dir_preProImages = run.input_datasets['preProcessed_data'] 
+
+    # Save in log file all defined parameters
+    run.log_list('Patients used for training', patients_list_train)
+    run.log('Number of epochs',  epochs)
+    run.log('Batch size',  batch_size)
+    run.log('Patch size', patch_size)
+    run.log('Number of K folds', k_folds)
+    run.log('Learning rates', lr)
+
+else:
+    # Directories with data
+    dir_datasets = "NEMESIS_images/datasets/"
+    dir_gtMaps = "NEMESIS_images/GroundTruthMaps/"
+    dir_preProImages = "NEMESIS_images/preProcessedImages/"
+    dir_rawImages = "NEMESIS_images/tif/"
 
 #*####################
 #* LOAD TRAIN IMAGES
@@ -263,6 +252,17 @@ print('\tSPE = ', str(metrics['SPE']))
 print('\tPRECISION = ', str(metrics['PRECISION']))
 print('\tCONFUSION MATRIX: \n\t', str(metrics['CON_MAT']))
 
+
+# If using Azure, log the metrics
+if useAzure:
+    # Save in log file all obtained metrics
+    run.log('OACC', metrics['OACC'])
+    run.log_list('ACC',  metrics['ACC'])
+    run.log_list('SEN', metrics['SEN'])
+    run.log_list('SPE', metrics['SPE'])
+    run.log_list('PRECISSION', metrics['PRECISION'])
+    run.log('CONFUSION MATRIX', metrics['CON_MAT'])
+
 #*###############################
 #* COMPUTE CLASSIFICATION MAP
 
@@ -295,7 +295,7 @@ if ( batch_dim == '3D' ):
     dims = cm_test.patient_cubes[patient_test[0]]['pad_groundTruthMap'].shape
 
     # Generate classification map from the predicted labels
-    mts.get_classification_map(pred_labels, true_labels, label_coordenates, dims = dims, title="Test classification Map", plot = True, save_plot = False, save_path = None, plot_gt = True, padding=cm_test.pad_margin)
+    fig_predMap, fig_GTs = mts.get_classification_map(pred_labels, true_labels, label_coordenates, dims = dims, title="Test classification Map", plot = False, save_plot = False, save_path = None, plot_gt = True, padding=cm_test.pad_margin)
 
 #*######################################################
 #* PREDICT WITH THE MODEL THE ENTIRE PREPROCESSED CUBE
@@ -317,7 +317,26 @@ if ( batch_dim == '3D' ):
     pred_labels = model.predict(batch_x = cube_tensor_batch)
 
     # Generate classification map from the predicted labels
-    mts.get_classification_map(pred_labels=pred_labels, true_labels=None, coordenates=cube_coordenates, dims=dims, title="Test Cube classification Map", plot = True, save_plot = False, save_path = None, plot_gt = False, padding=cm_test.pad_margin)
+    fig_predCube, _ = mts.get_classification_map(pred_labels=pred_labels, true_labels=None, coordenates=cube_coordenates, dims=dims, title="Test Cube classification Map", plot = False, save_plot = False, save_path = None, plot_gt = False, padding=cm_test.pad_margin)
+
+
+# If using Azure, log classification maps and end run
+if useAzure:
+
+    run.log_list('Patients used to classify', patient_test)
+    run.log_image(name='Predicted GT classification map', plot=fig_predMap)
+    run.log_image(name='Predicted and true GT classification maps', plot=fig_GTs)
+    run.log_image(name='Predicted cube classification map', plot=fig_predCube)
+
+    # Save the trained model in the outputs folder
+    os.makedirs('outputs', exist_ok=True)
+    joblib.dump(value=model, filename='outputs/best_CNN_model.pt')
+
+    run.complete()
+    
+    # Register the model
+    run.register_model(model_path='outputs/best_CNN_model.pt', model_name='Conv2DNet_test')
+
 
 #*#### END MAIN PROGRAM #####
 #*###########################
