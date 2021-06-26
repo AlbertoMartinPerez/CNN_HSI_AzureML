@@ -1799,7 +1799,7 @@ class CrossValidator:
             best_Kn_OACC = 0
             
             for _ in range(0, self.k_folds, 1):
-                print('\t\t\t Current Kn fold =', Kn+1)
+                print('\n\t\t\t Current Kn fold =', Kn+1)
                 
                 # Create a Conv2DNet model. We need to define a new one for every Kn iteration
                 model = models.Conv2DNet(num_classes = self.numUniqueLabels, in_channels = self.numBands)
@@ -1828,7 +1828,7 @@ class CrossValidator:
                 Kn_OACC = mts.get_metrics(y_true_Kn, y_hat_Kn, self.numUniqueLabels)['OACC']
 
                 if (best_Kn_OACC < Kn_OACC):
-                    print('\t\t\t Found new best model!')
+                    print('\t\t\t ** Found new best model in Kn=', Kn, 'iteration! **')
                     best_Kn_OACC = Kn_OACC
 
                     # Save Kn CNN model in local variable
@@ -1857,7 +1857,7 @@ class CrossValidator:
             K_OACC = mts.get_metrics(y_true_K, y_hat_K, self.numUniqueLabels)['OACC']
 
             if (best_K_OACC < K_OACC):
-                print('\t\t Found new best model!')
+                print('\t\t ** Found new best model in K=', K, 'iteration! **')
                 best_K_OACC = K_OACC
 
                 # Save or update best CNN model obtained during double cross-validation
