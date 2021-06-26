@@ -21,8 +21,7 @@ import nn_models as models          # Import 'nn_models.py' file as 'models' to 
 import metrics as mts               # Import 'metrics.py' file as 'mts' to evluate metrics
 
 # Import Azure SKD for Python packages
-import azureml.core
-from azureml.core import Workspace, Dataset, Run, Experiment
+from azureml.core import Run
 
 import os                           # To extract path directory
 import joblib                       # To save trained model
@@ -64,6 +63,9 @@ lr = 0.01
 
 if useAzure:
 
+    # load the diabetes dataset
+    print("Loading arguments from the control Script run...")
+
     # Get script arguments 
     # (file datasets mount points for gt maps and preprocessed cubes)
     parser = argparse.ArgumentParser()
@@ -74,13 +76,10 @@ if useAzure:
     # Get the experiment run context
     run = Run.get_context()
 
-    # load the diabetes dataset
-    print("Loading Data from Azure...")
-
     # Get the training data path from the input arguments
     # (they will be used when creating an instance from 'CubeManager' class)
-    dir_gtMaps = run.input_datasets['gtMaps_data']
-    dir_preProImages = run.input_datasets['preProcessed_data'] 
+    dir_gtMaps = run.input_datasets['gtMaps_data'] + '/'
+    dir_preProImages = run.input_datasets['preProcessed_data'] + '/'
 
     # Save in log file all defined parameters
     run.log_list('Patients used for training', patients_list_train)
@@ -330,12 +329,19 @@ if useAzure:
 
     # Save the trained model in the outputs folder
     os.makedirs('outputs', exist_ok=True)
-    joblib.dump(value=model, filename='outputs/best_CNN_model.pt')
+    joblib.dump(value=model, filename='./outputs/best_CNN_model.pt')
+
+    # Upload the model into the run history record
+    # name = The name of the file to upload.
+    # path_or_stream = The relative local path or stream to the file to upload.
+    run.upload_file(name='./outputs/best_CNN_model.pt', path_or_stream='./outputs/best_CNN_model.pt')
 
     run.complete()
     
+    print('\nAzure run is now completed.')
+
     # Register the model
-    run.register_model(model_path='outputs/best_CNN_model.pt', model_name='Conv2DNet_test')
+    run.register_model(model_path='./outputs/best_CNN_model.pt', model_name='Conv2DNet_test')
 
 
 #*#### END MAIN PROGRAM #####
