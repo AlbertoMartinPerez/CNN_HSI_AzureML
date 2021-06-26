@@ -92,16 +92,11 @@ def f_cube(image):
     #  It must be applied an spectral correction
     # input: image [MxN] matrix (uint8 or uint16) (for 8 and 10 bit images)
     # output: image cube [mxnxb] matrix (double)
-    
-    #imCube = np.zeros(np.floor(image.shape[0] / 5), np.floor(image.shape[1] / 5), 25) #Declaras el cubo que vas a devolver
-    imCube = np.zeros((image.shape[0] // 5, image.shape[1] // 5, 25)) #Declaras el cubo que vas a devolver
+    filter_height = 1085
+    filter_width = 2045
+    bands = 25
 
-    for x in range(0, image.shape[1] - 3): #Recorres columnas hasta el final - 3 (offset)
-        for y in range(0, image.shape[0] - 3): #Recorres filas hasta el final - 3 (offset)
-
-            imCube[(y//5), (x//5), np.mod(y,5)*5 + np.mod(x,5)] = image[y,x]
-
-    return imCube
+    return image[:-3,:-3].reshape(filter_height, filter_width//5, 5).transpose(1,0,2).reshape(filter_width//5, filter_height//5, bands).transpose(1,0,2)
 
 ### WHITE AND DARK CALIBRATION
 def f_calibration(image, imageW, imageD):
