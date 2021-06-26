@@ -14,7 +14,7 @@ import numpy as np                  # Import numpy
 
 # ? GPU FUNCTIONALITY HERE
 # Save in 'device' whether we use the CPU or the GPU via CUDA to train Neural Networks
-# device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
+device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
 # device = 'cpu'
 
 #*###############################
@@ -339,7 +339,7 @@ class Conv2DNet(nn.Module):
 
         # ? GPU FUNCTIONALITY HERE
         # Store the model inside the GPU memory
-        #self.cuda()
+        self.cuda()
 
         # Set the model to train mode to let know PyTorch that during backpropagation
         # it should not apply drop-out, batch norm or any layer with special behaviours
@@ -350,9 +350,9 @@ class Conv2DNet(nn.Module):
         #* FOR LOOP TO TRAIN THE MODEL WITHT THE CORRESPONDING NUMBER OF EPOCHS
         #* IT ALSO SHOWS A PROGRESS BAR THAT INCREASES ON EVERY EPOCH
         #*
-        print("\nStarted training your Neural Network of type: ", str(type(self)))
+        print("\n\t\t\t Started training your Neural Network of type: ", str(type(self)))
 
-        for epoch in tqdm(range(epochs)):
+        for epoch in range(epochs): #tqdm(range(epochs)):
 
             running_loss = 0.0
             correct_train = 0.0
@@ -364,15 +364,15 @@ class Conv2DNet(nn.Module):
 
                 # ? GPU FUNCTIONALITY HERE
                 # Transfer the current batch tensors to the GPU if available
-                # X = X.to(device)
-                # Y = Y.to(device)
+                X = X.to(device)
+                Y = Y.to(device)
 
                 # Forward pass. This will automatically call the 'forward(self, x)' method
                 y_pred = self(X)    # 'self' is the model itself. We are basically doing 'model(X)'
 
                 # ? GPU FUNCTIONALITY HERE
                 # Transfer the created tensor to the GPU
-                # y_pred = y_pred.to(device)
+                y_pred = y_pred.to(device)
 
                 # Compute loss.
                 # Loss function needs the predicted outputs from 'sef.model()' (or 'self(x)' in our case) and a row vector
@@ -406,7 +406,7 @@ class Conv2DNet(nn.Module):
             #* END FOR LOOP
             #*##############
         
-        print("Finished training! Your model is now ready to predict.\n")
+        print("\t\t\t Finished training! Your model is now ready to predict.\n")
         #*
         #* END FOR LOOP
         #*##############
@@ -447,7 +447,7 @@ class Conv2DNet(nn.Module):
 
                 # ? GPU FUNCTIONALITY HERE
                 # Transfer the current batch tensor to the GPU if available
-                # X = X.to(device)
+                X = X.to(device)
 
                 # For every single batch 'X', we calculate the label probabilities for every element.
                 # 'ps' is an array where each row represents the probabilities of each element to be one of the output classes returned by the model.
