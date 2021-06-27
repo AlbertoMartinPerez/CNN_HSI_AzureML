@@ -11,9 +11,11 @@ import numpy as np                          # Import numpy
 import torch                                # Import PyTorch
 from scipy.io import loadmat                # Import scipy.io to load .mat files
 from sklearn.model_selection import KFold   # Import KFold cross-validator from sklearn
+from PIL import Image                       # Import 'Image' from PIL to load .tif images
 
 import metrics as mts                       # Import 'metrics.py' file as 'mts' to evluate metrics inside CrossValidator class
 import nn_models as models                  # Import 'nn_models.py' file as 'models' to define any new Neural Network included in the file 
+import preProcessing_chain as ppc           # Import 'preProcessing_chain.py' as 'ppc' to preprocess raw hyperspectral images
 
 #*################################
 #*#### DatasetManager class  #####
@@ -1258,6 +1260,14 @@ class CubeManager:
 
     def create_cube_batch(self):
         """
+        Generate batches from the entire input preprocessed image, which was loaded when used
+        the 'load_patient_cubes' method of the CubeManager class.
+
+        Outputs
+        ---------
+        Python dictionary including 2 Python lists
+        - 'data':   Python list with all batches.
+        - 'coords': Python coordenates for every patch in the batches.
         """
         #*################
         #* ERROR CHECKER
@@ -1873,7 +1883,287 @@ class CrossValidator:
 #*#######################
 
 
+#*####################
+#* RawManager class
+#*
+class RawManager:
+    """
+    This class is used to load raw .tif images taken with the
+    XIMEA Snapshot MQ022HG-IM-SM5X5-NIR hyperspectral camera.
+    """
 
+    def __init__(self, raw_image, white_ref, black_ref, patch_size = 7, batch_size = 16):
+        """
+        Constructor for the RawManager class. Loads input tif images using PIL package and 
+        convert them to numpy array for easy management.
 
-# todo: Define method to load raw images ('.tif') // load_patient_rawImages()
-# ? Maybe create a new class?
+        Inputs
+        ---------
+        - 'raw_image':  Tif raw brain image from the XIMEA snapshot hyperspectral camera.
+        - 'white_ref':  Tif white reference image from the XIMEA snapshot hyperspectral camera.
+        - 'black_ref':  Tif black reference image from the XIMEA snapshot hyperspectral camera.
+        """
+
+        self.raw_image = np.array(Image.open(raw_image))
+        self.white_ref = np.array(Image.open(white_ref))
+        self.black_ref = np.array(Image.open(black_ref))
+
+        self.processedCube = None
+        self.pad_processedCube = None   # pre-processed cube with padding
+
+        self.patch_size = patch_size
+        self.pad_margin = int(np.ceil(self.patch_size/2))
+        self.batch_size = batch_size
+
+    def preProcessImage(self):
+        """
+        Process the input raw images added to the RawManager instance constructor
+        to generate a calibrated, spectral corrected and normalized cube.
+        It also adds padding to the cube to properly create patches for the batches.
+        The pre-processing steps are:
+            1. Calibrate raw image using the white and black reference
+            2. Generate a cube from the calibrated image
+            3. Spectrally correct the cube using XIMEA correction matrix
+            4. Normalize the cube using the HELICOID normalization
+        """
+        # Apply the pre-processing chain to the input image
+        self.processedCube = ppc.f_norm_helicoid(ppc.f_spectral_correction(ppc.f_cube(ppc.f_calibration(self.raw_image , self.white_ref, self.black_ref))))
+
+        # Apply a constant padding to the preProcessed cube to the height and width dimensions (not the spectral channels)
+        # Save the padded cube to the instance attribute
+        self.pad_processedCube = np.pad(self.processedCube, [(self.pad_margin, self.pad_margin), (self.pad_margin, self.pad_margin), (0,0)], 'constant')
+
+    def create_cube_batch(self):
+        """
+        Generate batches from the entire input preprocessed image, which was loaded when used
+        the 'load_patient_cubes' method of the CubeManager class.
+
+        Outputs
+        ---------
+        Python dictionary including 2 Python lists
+        - 'data':   Python list with all batches.
+        - 'coords': Python coordenates for every patch in the batches.
+        """
+
+        # Create a copy of the entire HSI padded cube from the loaded patient image
+        cube = np.copy(self.pad_processedCube)
+        gt = np.copy(self.processedCube)
+        
+        # Create mask of 1s with same dimension as the loaded ground truth map
+        mask = np.ones( (gt.shape[0], gt.shape[1]) )
+
+        # Create empty Python lists to append all batches with 3D patches
+        list_cube_batch = []
+        list_coords_batch = []
+
+        #*###############################################
+        #* WHILE LOOP CREATES 1 BATCH EVERY ITERATION
+        #*
+        while np.sum(mask > 0) >= self.batch_size:                # Stay in this while loop if the number of samples left in 'dataTemp' is equal or greater than 'bath_size'
+            
+            list_cube_samples = []                                       # Create empty Python list to append data cube samples
+            list_coord_samples = []                                      # Create empty Python list to append data ground truth map label samples
+
+            # Extract the coordenates from all pixels left
+            x, y = np.nonzero(mask == 1)
+
+            # From all pixels left, extract 'self.batch_size' random coordenates without replacement
+            indices = np.random.choice(len(x), self.batch_size, replace=False)
+
+            # Create a numpy array with the coordenates for the sampled indices and append to the list.
+            list_coord_samples.append( np.array([x[indices], y[indices]]).transpose() )
+
+            # Generate 3D patches from the extract coordenates using the patient HSI cube
+            # Since the mask does not have the padding, we have to add the pad_margin when accessing the cube
+            # since the cube has padding.
+            list_cube_samples.append( self.__get_patches_full_cube(x[indices] + self.pad_margin, y[indices] + self.pad_margin, cube) )
+
+            # Delete from the mask the used coordenates to create the patches
+            mask[x[indices],y[indices]] = 0
+
+            # Convert both Python lists 'list_cube_samples' and 'list_coord_samples' to numpy arrays by using 'np.concatenate()'.
+            # This way we concatenate all pixels from all labels to be stored in 1 single variable, which would represent 1 single batch
+            cube_batch = np.concatenate(list_cube_samples, axis=0)
+            coords_batch = np.concatenate(list_coord_samples, axis=0)
+
+            # Append each batch to its corresponding list
+            list_cube_batch.append(cube_batch)
+            list_coords_batch.append(coords_batch)
+        #*
+        #* END OF WHILE 
+        #*################
+
+        #*########################################################
+        #* IF STATEMENT IS USED TO APPEND THE REMAINING DATA 
+        #* THAT CAN NOT BE USED AS A BATCH OF 'batch_size' SIZE
+        #*
+        if ( mask[mask > 0].shape[0] / self.batch_size > 0):
+
+            # Extract the coordenates for the remaining left pixels in the mask
+            x, y = np.nonzero(mask != 0)
+            
+            # Create a numpy array with the coordenates for the sampled indices and append to the list
+            list_coords_batch.append(np.array([x, y]).transpose())
+
+            # Generate 3D patches from the extract coordenates using the patient HSI cube.
+            # Since the mask does not have the padding, we have to add the pad_margin when accessing the cube
+            # since the cube has padding.
+            list_cube_batch.append(self.__get_patches_full_cube(x + self.pad_margin, y + self.pad_margin, cube))
+
+        #*   
+        #* END OF IF
+        #*##############
+
+        return {'data': list_cube_batch, 'coords': list_coords_batch}
+
+    def __get_patches_full_cube(self, x, y, cube):
+        """
+        (Private method) Create 3D patches using the input coordenates and extract data from the entire
+        preprocessed cube passed as input. 
+        
+        Inputs
+        ----------
+        - 'x' and 'y':  Coordenates to access the input 'cube' and use them as center coordenates
+                        for the patches.
+        - 'cube':       Numpy array. Preprocessed cube with already added padding.
+
+        Outputs
+        ----------
+        - 'patches':    Numpy array with all generated patches from the centered coordenates passed as inputs.
+        """
+    
+        # Create empty 'len(x)' arrays (or patches) with size: "number of bands" x "patch_size" x "patch_size" 
+        patches = np.zeros((len(x), cube.shape[-1], self.patch_size, self.patch_size))
+
+		# Extract start coordenates for 'x' and 'y' Python lists passed as parameter 
+        xs = (x - int(self.patch_size/2)).astype(int)
+        ys = (y - int(self.patch_size/2)).astype(int)
+
+		# Extract end coordenates for 'x' and 'y' Python lists passed as parameter
+        xe = xs + self.patch_size
+        ye = ys + self.patch_size
+
+        #*############################################################
+        #* FOR LOOP ITERATES OVER ALL PASSED PIXEL COORDENATES TO 
+        #* GENERATE PATCHES FROM THE HSI CUBES AND SAVE THEM IN
+        #* THE 'patches' VARIABLE.
+        #*
+        for i in range(len(x)):
+            # Save inside the 'patches' variable each small 3D patch of size "number of bands" x "patch_size" x "patch_size"
+		    # Use 'self.cube' attribute which contains the 'preProcessed' image. From the 'preProcessed' image extract small patches
+		    # from the coordenates extracted.
+            patches[i,:,:,:] = np.transpose(cube[xs[i]:xe[i], ys[i]:ye[i], :], (2, 0, 1) )
+
+        #*
+        #* END FOR LOOP
+        #*##############
+
+        return patches
+
+    def batch_to_tensor(self, python_list, data_type):
+        """
+        Convert all numpy array batches included in a Python list to desired PyTorch tensors types.
+        
+        Inputs
+        ----------
+        - 'python_list':    Python list with batches as numpy arrays
+        - 'data_type':      PyTorch tensor type to convert the numpy array batch to desired tensor type
+
+        Outputs
+        ----------
+        - 'tensor_batch':   Python list with batches as PyTorch tensors
+        """
+
+        #*################
+        #* ERROR CHECKER
+        #*
+        # Check if the input batches are numpy arrays
+        if not ( isinstance(python_list, list) ):
+            raise TypeError("Expected list as input. Received input of type: ", str(type(python_list)) )
+        # Check if the input batches are numpy arrays
+        if not ( isinstance(python_list[0], np.ndarray) ):
+            raise TypeError("Expected numpy arrays as input. Received input of type: ", str(type(python_list[0])) )
+        #*    
+        #* END OF ERROR CHECKER ###
+        #*#########################
+
+        tensor_batch = []                               # Create empty Python list to return
+
+        #*###############################################################
+        #* FOR LOOP TO ITERATE OVER ALL BATCHES INCLUDED IN THE INPUT 
+        #* PARAMETER 'python_list' AND CONVERT THEM AS PYTORCH TENSORS
+        #*
+        for b in range(0, len(python_list), 1):
+            tensor_batch.append( torch.from_numpy(python_list[b]).type(data_type) )
+        #*    
+        #* END FOR LOOP
+        #*###############
+
+        return tensor_batch
+
+    def concatenate_list_to_numpy(self, python_list):
+        """
+        Concatenate all elements in the input Python list to return a numpy array.
+
+        Inputs
+        ----------
+        - 'python_list':    Python list to concatenate.
+            
+        Outputs
+        ----------
+        - Numpy array with all elements of the python list concatenated
+        """
+
+        #*##############################################################
+        #* IF ELSE STATEMENT TO CHECK SHAPE OF THE ELEMENTS IN THE INPUT
+        #* PYTHON LIST. GENERATE DIFFERENT TEMPORARY ARRAYS DEPENDING
+        #* ON THE INPUT BATCHES (2d with shape 2 and 3d with shape 4)
+        #*
+        if ( len(python_list[0].shape) == 2 ):
+            # If entered here, we are working with data with only rows and columns (samples x wavelenghts)
+            # Some examples are: 'self.data', 'self.label4Classes', 'self.label' or 'self.labels_coords'
+            # Create temporary array of 1 empty row with same columns as the elements in the python list
+            temp_array = np.zeros((1, python_list[0].shape[-1]))
+
+        elif ( len(python_list[0].shape) == 4 ):
+            # If entered here, we are working with data with ("patch_id" x "number of bands" x "patch_size" x "patch_size")
+            # Create temporary array of 1 array of ("patch_size" x "patch_size" x "number of bands")
+            temp_array = np.zeros_like(python_list[0])[0, :, :, :].reshape(1, python_list[0].shape[1], python_list[0].shape[2], python_list[0].shape[3])
+        #*
+        #* END OF IF ELSE
+        #*################
+
+        # Flag to indicate that we have deleted the first row of the temporary array,
+        # otherwise we would append always the empty row.
+        deleted_row = False
+
+        #*############################################################
+        #* FOR LOOP ITERATES OVER ALL ELEMENTS IN THE INPUT LIST
+        #* AND STACK THEM IN THE TEMPORARY ARRAY
+        #*
+        for element in python_list:
+            temp_array = np.vstack((temp_array, element))
+
+            #*############################################################
+            #* IF STATEMENT TO CHECK IF FIRST ROW OF THE TEMP ARRAY HAS
+            #* BEEN DELETED. (remember they where created with the first 
+            #* row as empty)
+            #*
+            if not (deleted_row):
+                # Delete the first empty row
+                temp_array = np.delete(temp_array, 0, axis = 0)
+                # Update flag to True
+                deleted_row = True       
+            #*
+            #* END OF IF
+            #*############
+        #*
+        #* END FOR LOOP
+        #*##############
+
+        # Return the numpy array with all elements and delete the first empty row
+        return temp_array
+
+#*
+#* RawManager class
+#*####################
