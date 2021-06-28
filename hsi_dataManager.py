@@ -1904,9 +1904,9 @@ class RawManager:
         - 'black_ref':  Tif black reference image from the XIMEA snapshot hyperspectral camera.
         """
 
-        self.raw_image = np.array(Image.open(raw_image))
-        self.white_ref = np.array(Image.open(white_ref))
-        self.black_ref = np.array(Image.open(black_ref))
+        self.raw_image = raw_image
+        self.white_ref = white_ref
+        self.black_ref = black_ref
 
         self.processedCube = None
         self.pad_processedCube = None   # pre-processed cube with padding
