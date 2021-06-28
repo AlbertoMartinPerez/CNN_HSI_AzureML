@@ -259,11 +259,16 @@ class Conv2DNet(nn.Module):
     This class define all the layers of the Conv2DNet network and packs them by
     enheriting from the 'Module' class defined by Pytorch.
     - Important: Using 'self' within this class means using the model itself (self = self.model)
-    - Important: This network works with 2D data!
+    - Important: This network works with 3D patches!
 
     Layers
     ----------
-
+    - Conv2d
+    - MaxPool2d
+    - ReLU
+    - Linear
+    - ReLU
+    - Linear
     """
 
     #*#######################################
@@ -464,8 +469,8 @@ class Conv2DNet(nn.Module):
         return np.transpose(np.concatenate(pred_labels, axis = 1))
 
     #*
-    #*#### END DEFINED FourLayerNet METHODS #####
-    #*###########################################   
+    #*#### END DEFINED Conv2DNet METHODS #####
+    #*########################################   
 
 #*
 #*#### Conv2DNet class  #####
