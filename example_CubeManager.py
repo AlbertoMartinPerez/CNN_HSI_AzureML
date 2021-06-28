@@ -1,18 +1,9 @@
-######################################################################################################
-# DESCRIPTION OF THIS SCRIPT:
-# Basic script to learn how to use the 'CubeManager' class from 'hsi_dataManager.py' file.
-#-----------------------------------------------------------------------------------------------------
-# todo: UPDATE THIS LIST!
-# It demonstrates:
-#   1) How to create a CubeManager instance
-#   2) How to load '_dataset.mat' files to the CubeManager instance for training
-#   3) How to create 2D batches with loaded data in the CubeManager instance
-#   4) How to convert 2D batches to batch PyTorch tensors with the CubeManager instance
-#   5) How to create a FourLayerNet model and how to train it with the batch 
-#   6) How to load a single '_dataset.mat' with a new CubeManager instance for testing
-#   7) How to predict the test dataset with our trained model
-#   8) How to compute prediction metrics and print them
-#######################################################################################################
+
+#*#####################################################################################################
+#* DESCRIPTION OF THIS SCRIPT:
+#* Basic script to learn how to use the 'CubeManager' class from 'hsi_dataManager.py' file with Azure
+#* Machine Learning and Azure SDK for Python.
+#*######################################################################################################
 
 import torch                        # Import PyTorch
 
@@ -31,35 +22,11 @@ import argparse                     # To get all arguments passed to this script
 #*#### START MAIN PROGRAM #####
 #*
 
-# Desired patient images ID
-# ['ID0018C09', 'ID0025C02', 'ID0029C02', 'ID0030C02', 'ID0033C02', 'ID0034C02', 'ID0035C02', 'ID0038C02', 'ID0047C02', 'ID0047C08', 'ID0050C05', 'ID0051C05', 'ID0056C02',
-# 'ID0064C04', 'ID0064C06', 'ID0065C01', 'ID0065C09', 'ID0067C01', 'ID0068C08', 'ID0070C02', 'ID0070C05', 'ID0070C08', 'ID0071C02', 'ID0071C011', 'ID0071C014']
-patients_list_train = ['ID0030C02', 'ID0033C02', 'ID0035C02']
-patient_test = ['ID0033C02']
-
-# Variable to indicate if using data from Azure
-useAzure = True
-
 # Python dictionary to convert labels to label4Classes
 dic_label = {'101': 1, '200': 2, '220': 2, '221': 2, '301': 3, '302': 4, '320': 5}
 
-# Determine dimension of batches for the Neural Network
-batch_dim = '3D'
-
-# Number of epochs
-epochs = 1
-
-# Batch size
-batch_size = 16
-
-# Patch size (recommended to be always odd)
-patch_size = 7
-
-# K_folds
-k_folds = 2
-
-# Learning rate
-lr = 0.01
+# Variable to indicate if using data from Azure
+useAzure = True
 
 if useAzure:
 
@@ -69,9 +36,31 @@ if useAzure:
     # Get script arguments 
     # (file datasets mount points for gt maps and preprocessed cubes)
     parser = argparse.ArgumentParser()
-    parser.add_argument('--input-gt-data', type=str, dest='data_folder', help='Ground truth map data mount point')
-    parser.add_argument('--input-preProcessed-data', type=str, dest='data_folder', help='Pre-processed cubes data mount point')
+    parser.add_argument('--gt-data', type=str, dest='data_folder', help='Ground truth map data mount point')
+    parser.add_argument('--preProcessed-data', type=str, dest='data_folder', help='Pre-processed cubes data mount point')
+    parser.add_argument('--patients_list_train', type=str, dest='patients_list_train', help='List of patients used to train CNN models')
+    parser.add_argument('--patient_test', type=str, dest='patient_test', help='List of patients used to classify with trained CNN model')
+    parser.add_argument('--batch_dim', type=str, dest='batch_dim', default='3D', help='Batch dimension (3D or 2D)')
+    parser.add_argument('--epochs', type=int, dest='epochs', default=100, help='Number of epochs used to train CNN models')
+    parser.add_argument('--batch_size', type=int, dest='batch_size', default=16, help='Size of batches. Number of patches included in each batch')
+    parser.add_argument('--patch_size', type=int, dest='patch_size', default=7, help='Heigh and width size of patches (square patches)')
+    parser.add_argument('--k_folds', type=int, dest='k_folds', default=5, help='Number of k-folds to use during double-cross validation')
+    parser.add_argument('--learning_rate', type=float, dest='learning_rate', default=0.001, help='Learning rate parameter')
+    parser.add_argument('--model_name', type=str, dest='model_name', default='Conv2DNet_default', help='Name of the CNN model')
+
     args = parser.parse_args()
+
+    # Load all parameters passed as input to the script
+    patients_list_train = [str(patient) for patient in args.patients_list_train.split(',')]
+    patient_test = [args.patient_test]
+
+    batch_dim = args.batch_dim
+    epochs = args.epochs
+    batch_size = args.batch_size
+    patch_size = args.patch_size
+    k_folds = args.k_folds
+    lr = args.learning_rate
+    model_name = args.model_name
 
     # Get the experiment run context
     run = Run.get_context()
@@ -83,6 +72,8 @@ if useAzure:
 
     # Save in log file all defined parameters
     run.log_list('Patients used for training', patients_list_train)
+    run.log_list('Patients used for testing', patient_test)
+    run.log('Batch dimensions',  batch_dim)
     run.log('Number of epochs',  epochs)
     run.log('Batch size',  batch_size)
     run.log('Patch size', patch_size)
@@ -90,11 +81,36 @@ if useAzure:
     run.log('Learning rates', lr)
 
 else:
+    # Desired patient images ID
+    patients_list_train = ['ID0030C02', 'ID0033C02', 'ID0035C02']
+    patient_test = ['ID0033C02']
+
     # Directories with data
     dir_datasets = "NEMESIS_images/datasets/"
     dir_gtMaps = "NEMESIS_images/GroundTruthMaps/"
     dir_preProImages = "NEMESIS_images/preProcessedImages/"
     dir_rawImages = "NEMESIS_images/tif/"
+
+    # Python dictionary to convert labels to label4Classes
+    dic_label = {'101': 1, '200': 2, '220': 2, '221': 2, '301': 3, '302': 4, '320': 5}
+
+    # Determine dimension of batches for the Neural Network
+    batch_dim = '3D'
+
+    # Number of epochs
+    epochs = 1
+
+    # Batch size
+    batch_size = 16
+
+    # Patch size (recommended to be always odd)
+    patch_size = 7
+
+    # K_folds
+    k_folds = 2
+
+    # Learning rate
+    lr = 0.01
 
 #*####################
 #* LOAD TRAIN IMAGES
@@ -112,38 +128,6 @@ print("\tTraining images have been loaded. Creating training batches...")
 # Create batches with the loaded data. Returns 'batches' which is a Python dictionary including 2 Python lists, 'data' and 'labels', containing all batches
 batches_train = cm_train.create_batches()
 
-"""
-# PRINT IN TERMINAL THE SHAPE OF EVERY CREATED BATCH
-if ( batch_dim == '2D' ):
-    i = 0
-    for b in batches_train['data']:
-        print('Size of batch ', i+1, ' = ', batches_train['data'][i].shape )
-        i += 1
-
-    print('Last batch ', batches_train['data'][i-1] )
-
-elif ( batch_dim == '3D' ):
-    i = 0
-    for b in batches_train['cube']:
-        print('Size of batch ', i+1, ' = ', batches_train['cube'][i].shape )
-        i += 1
-
-    print('Last batch ', batches_train['cube'][i-1] )
-
-stop
-"""
-
-"""
-print("\n\t#####")
-print('\t batches_train:')
-print("\t\t type(batches_train['cube']) = ", type(batches_train['cube']))
-print("\t\t len(batches_train['cube'] = ", len(batches_train['cube']))
-print("\t\t type(batches_train['cube'][0]) = ", type(batches_train['cube'][0]))
-print("\t\t batches_train['cube'][0].shape = ", batches_train['cube'][0].shape )
-print("\t\t batches_train['cube'][0][0].shape = ", batches_train['cube'][0][0].shape )
-"""
-
-
 print("\tTraining batches have been created.")
 
 if ( batch_dim == '2D' ):
@@ -153,15 +137,6 @@ if ( batch_dim == '2D' ):
     labels_tensor_batch = cm_train.batch_to_tensor(batches_train['label4Classes'], data_type = torch.LongTensor)
 
     print("\tTensors have been created.")
-
-"""    
-    print('### DEBUG ###')
-    print('data_tensor_batch: ')
-    print('\t type(data_tensor_batch) = ', type(data_tensor_batch))
-    print('\t data_tensor_batch[0].shape = ', data_tensor_batch[0].shape)
-    print('\t type(labels_tensor_batch) = ', type(labels_tensor_batch))
-    print('\t labels_tensor_batch[0].shape = ', labels_tensor_batch[0].shape)
- """   
 
 #*######################
 #* TRAIN NEURAL NETWORK
@@ -329,19 +304,26 @@ if useAzure:
 
     # Save the trained model in the outputs folder
     os.makedirs('outputs', exist_ok=True)
-    joblib.dump(value=model, filename='./outputs/best_CNN_model.pt')
+    # Save best PyTorch model
+    torch.save(model, './outputs/best_CNN_model.pt')
+    # To solve the following error, we have to specifiy that the model will be used on a CPU
+    # 'RuntimeError: Attempting to deserialize object on a CUDA device but torch.cuda.is_available() is False. 
+    # If you are running on a CPU-only machine, please use torch.load with map_location=torch.device('cpu') to map 
+    # your storages to the CPU.'
+    PyTorch_model = torch.load('./outputs/best_CNN_model.pt', map_location=torch.device('cpu'))
+    joblib.dump(value=PyTorch_model, filename='./outputs/PyTorch_model.pt')
 
     # Upload the model into the run history record
     # name = The name of the file to upload.
     # path_or_stream = The relative local path or stream to the file to upload.
-    run.upload_file(name='./outputs/best_CNN_model.pt', path_or_stream='./outputs/best_CNN_model.pt')
+    run.upload_file(name='./outputs/PyTorch_model.pt', path_or_stream='./outputs/PyTorch_model.pt')
 
     run.complete()
     
     print('\nAzure run is now completed.')
 
     # Register the model
-    run.register_model(model_path='./outputs/best_CNN_model.pt', model_name='Conv2DNet_test')
+    run.register_model(model_path='./outputs/PyTorch_model.pt', model_name=model_name, model_framework='PyTorch', model_framework_version=torch.__version__)
 
 
 #*#### END MAIN PROGRAM #####
