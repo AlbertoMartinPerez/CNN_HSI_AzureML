@@ -7,10 +7,50 @@ import os, shutil
 # environment (True) or create a new one (False)
 use_registered_environment = True
 
+# Environment nname
+env_name = "PyTorch_Conv2DNet-experiment-env"
+
+# Experiment folder name
+experiment_folder = 'PyTorch_training_from_file_datasets'
+# Experiment name to deploy to Azure
+experiment_name = 'exp-4-PyTorch-train'
+
+# Model name
+model_name = 'Conv2DNet'
+
 # Available personal Workspace Compute Clusters (you may have different ones):
 # CPU cluster = 'CPU-CompCluster'
-# GPU cluster = 'GPU-CompCluster'
-cluster_name = 'GPU-CompCluster'
+# GPU cluster = 'GPU-ComCluster'
+cluster_name = 'GPU-ComCluster'
+
+#*###################################
+#* Variables for the ScriptRunConfig
+#*
+
+# Desired patient images ID
+# ['ID0018C09', 'ID0025C02', 'ID0029C02', 'ID0030C02', 'ID0033C02', 'ID0034C02', 'ID0035C02', 'ID0038C02', 'ID0047C02', 'ID0047C08', 'ID0050C05', 'ID0051C05', 'ID0056C02',
+# 'ID0064C04', 'ID0064C06', 'ID0065C01', 'ID0065C09', 'ID0067C01', 'ID0068C08', 'ID0070C02', 'ID0070C05', 'ID0070C08', 'ID0071C02', 'ID0071C011', 'ID0071C014']
+# Inside the input script for the ScripRunConfig, list variables are converted to Python lists
+patients_list_train = 'ID0030C02,ID0033C02,ID0035C02'
+patient_test = 'ID0033C02'
+
+# Determine dimension of batches for the Neural Network
+batch_dim = '3D'
+
+# Number of epochs
+epochs = 1
+
+# Batch size
+batch_size = 16
+
+# Patch size (recommended to be always odd)
+patch_size = 7
+
+# K_folds
+k_folds = 2
+
+# Learning rate
+lr = 0.001
 
 
 #*###########################
@@ -45,7 +85,6 @@ preProcessed_ds = Dataset.File.from_files(path=(default_ds, 'NEMESIS_images/preP
 #* CREATE A TRAINING SCRIPT
 #*
 # Create a folder for the experiment files
-experiment_folder = 'PyTorch_training_from_file_datasets'
 os.makedirs(experiment_folder, exist_ok=True)
 print(experiment_folder, 'folder created')
 
@@ -54,14 +93,12 @@ shutil.copy('./example_CubeManager.py', os.path.join(experiment_folder, "example
 shutil.copy('./hsi_dataManager.py', os.path.join(experiment_folder, "hsi_dataManager.py"))
 shutil.copy('./metrics.py', os.path.join(experiment_folder, "metrics.py"))
 shutil.copy('./nn_models.py', os.path.join(experiment_folder, "nn_models.py"))
-
+shutil.copy('./preProcessing_chain.py', os.path.join(experiment_folder, "preProcessing_chain.py"))
 
 #*###############################
 #* DEFINE AN ENVIRONMENT OR 
 #* USED A REGISTERED ENVIRONMENT
 #*
-
-env_name = "PyTorch_Conv2DNet-experiment-env"
 
 if use_registered_environment:
     # get the registered environment
@@ -99,8 +136,17 @@ else:
 # Reference to datasets and the paths where they will be downloaded in the environment
 script_config = ScriptRunConfig(source_directory=experiment_folder,
                                 script='example_CubeManager.py',
-                                arguments = ['--input-gt-data', gt_ds.as_named_input('gtMaps_data').as_download(),
-                                '--input-preProcessed-data', preProcessed_ds.as_named_input('preProcessed_data').as_download(),
+                                arguments = ['--gt-data', gt_ds.as_named_input('gtMaps_data').as_download(),
+                                '--preProcessed-data', preProcessed_ds.as_named_input('preProcessed_data').as_download(),
+                                '--patients_list_train', patients_list_train,
+                                '--patient_test', patient_test,
+                                '--batch_dim', batch_dim,
+                                '--epochs', epochs,
+                                '--batch_size', batch_size,
+                                '--patch_size', patch_size,
+                                '--k_folds', k_folds,
+                                '--learning_rate', lr,
+                                '--model_name', model_name
                                 ],
                                 environment=pytorch_env,
                                 compute_target=cluster_name
@@ -110,6 +156,5 @@ script_config = ScriptRunConfig(source_directory=experiment_folder,
 #* SUBMIT THE EXPERIMENT TO AZURE
 #*
 # submit the experiment
-experiment_name = 'exp-3-PyTorch-train'
 experiment = Experiment(workspace=ws, name=experiment_name)
 run = experiment.submit(config=script_config)
