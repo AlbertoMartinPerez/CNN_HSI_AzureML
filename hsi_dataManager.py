@@ -11,7 +11,6 @@ import numpy as np                          # Import numpy
 import torch                                # Import PyTorch
 from scipy.io import loadmat                # Import scipy.io to load .mat files
 from sklearn.model_selection import KFold   # Import KFold cross-validator from sklearn
-from PIL import Image                       # Import 'Image' from PIL to load .tif images
 
 import metrics as mts                       # Import 'metrics.py' file as 'mts' to evluate metrics inside CrossValidator class
 import nn_models as models                  # Import 'nn_models.py' file as 'models' to define any new Neural Network included in the file 
@@ -1899,9 +1898,9 @@ class RawManager:
 
         Inputs
         ---------
-        - 'raw_image':  Tif raw brain image from the XIMEA snapshot hyperspectral camera.
-        - 'white_ref':  Tif white reference image from the XIMEA snapshot hyperspectral camera.
-        - 'black_ref':  Tif black reference image from the XIMEA snapshot hyperspectral camera.
+        - 'raw_image':  Numpy array. Tif raw brain image from the XIMEA snapshot hyperspectral camera.
+        - 'white_ref':  Numpy array. Tif white reference image from the XIMEA snapshot hyperspectral camera.
+        - 'black_ref':  Numpy array. Tif black reference image from the XIMEA snapshot hyperspectral camera.
         """
 
         self.raw_image = raw_image
