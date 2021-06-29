@@ -128,7 +128,7 @@ def __class_metrics(confusion_mx):
 
 	return sensivity, specifity, accuracy, precission
 
-def get_classification_map(pred_labels, true_labels=None, coordenates=None, dims=None, title= None, plot = True, save_plot = False, save_path = None, plot_gt = True, padding = 0):
+def get_classification_map(pred_labels, true_labels=None, coordenates=None, dims=None, title= None, plot = True, save_plot = False, save_path = None, plot_gt = True, padding = 0, dpi=120):
 	"""
 	Generates classification maps from the input labels.
 	It can generate:
@@ -148,6 +148,7 @@ def get_classification_map(pred_labels, true_labels=None, coordenates=None, dims
     - 'save_path':		String variable containing the path to save the subplot
 	- 'plot_gt':		Boolean flag to indicate whether or not
 	- 'padding':		Integer. Value used to pad images to generate the batches. Used to delete empty rows and columns for the bottom and right.
+	- 'dpi':			Integer. DPI value when saving the pyplot figures.
     
 	Outputs
     ----------
@@ -202,7 +203,7 @@ def get_classification_map(pred_labels, true_labels=None, coordenates=None, dims
 	preds_color = preds_color[2*padding:preds_color.shape[0]-2*padding, 2*padding:preds_color.shape[1]-2*padding]
 
 	# Create plot with figure to be returned for Azure
-	fig_predMap = plt.figure()
+	fig_predMap = plt.figure(dpi=dpi)
 	plt.title(title)
 	plt.imshow(preds_color)
 	plt.axis('off')
@@ -225,8 +226,7 @@ def get_classification_map(pred_labels, true_labels=None, coordenates=None, dims
 		gt_color = gt_color[2*padding:gt_color.shape[0]-2*padding, 2*padding:gt_color.shape[1]-2*padding]
 		
 		# Create plot with figure to be returned for Azure
-		fig_GTs = plt.figure()
-		fig_GTs.suptitle(title)
+		fig_GTs = plt.figure(dpi=dpi)
 		fig_GTs.add_subplot(1, 2, 1)
 		plt.imshow(preds_color)
 		plt.title("Prediction")
