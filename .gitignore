@@ -3,7 +3,8 @@ NEMESIS_images/
 __pycache__/
 scripts_guille/
 Azure_Machine_Learning_Notebooks/
-PyTorch_training_from_file_datasets/
+Azure_PyTorch_training/
 brain_classification_service/
 temp.py
 config.json
+classificationMap.png
