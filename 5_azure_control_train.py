@@ -15,9 +15,6 @@ experiment_folder = 'PyTorch_training_from_file_datasets'
 # Experiment name to deploy to Azure
 experiment_name = 'exp-4-PyTorch-train'
 
-# Model name
-model_name = 'Conv2DNet'
-
 # Available personal Workspace Compute Clusters (you may have different ones):
 # CPU cluster = 'CPU-CompCluster'
 # GPU cluster = 'GPU-ComCluster'
@@ -34,11 +31,14 @@ cluster_name = 'GPU-ComCluster'
 patients_list_train = 'ID0030C02,ID0033C02,ID0035C02'
 patient_test = 'ID0033C02'
 
+# Model name
+model_name = 'Conv2DNet_' + patient_test
+
 # Determine dimension of batches for the Neural Network
 batch_dim = '3D'
 
 # Number of epochs
-epochs = 1
+epochs = 10
 
 # Batch size
 batch_size = 16
