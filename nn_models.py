@@ -284,9 +284,14 @@ class Conv2DNet(nn.Module):
         ----------
         - 'num_classes':    (int) Number of unique labels to classify in the training data.
         - 'in_channels':    (int) Number of channels in the input image.
+
+        Attributes
+        - fig_epoch_loss_acc:   PyPlot figure with the epoch/loss-accuracy plot.
         """
 
         super(Conv2DNet, self).__init__()
+
+        self.fig_epoch_loss_acc = None
 
         # todo: Properly define the CNN architecture
 
@@ -328,15 +333,15 @@ class Conv2DNet(nn.Module):
         - batch_y:  Python list containing PyTorch tensor batches labels destined for training
         - epochs:   Number of epochs to run over the training data
         - plot:     Flag to whether or not plot the loss and accuracy per epoch
-        - lr:       Learning rate used in the optimizer
+        - lr:       Learning rate used in the optimizer  
         """
     	# Define two empty arrays that will store, for each epoch, the cost and the accuracy
     	# These arrays basically are as big as the number of epochs (or iterations) over the
     	# the training set, meaning that each position on these arrays will have the cost and
     	# the accuracy for every epoch.
     	# They will be used to plot graphs and determine if the training is good or not.
-        loss_train = np.zeros(epochs)
-        accuracy = np.zeros(epochs)
+        loss_train = np.zeros(epochs+1)     # We add +1 for the plot graph. The first element would not be used, then we have to add another zero.
+        accuracy = np.zeros(epochs+1)
 
         # Loss and Optimizer
         optimizer = torch.optim.Adam(self.parameters(), lr = lr)    # 'self' is the model itself. We are basically doing 'model.parameters()'
@@ -357,7 +362,8 @@ class Conv2DNet(nn.Module):
         #*
         print("\n\t\t\t Started training your Neural Network of type: ", str(type(self)))
 
-        for epoch in range(epochs): #tqdm(range(epochs)):
+        # Start at 1 and end with the number of epochs  
+        for epoch in range(1, epochs+1, 1): #tqdm(range(epochs)):
 
             running_loss = 0.0
             correct_train = 0.0
@@ -401,7 +407,7 @@ class Conv2DNet(nn.Module):
                 # Apply softmax and get the value of the tensor with highest probability. Store the predicted class in 'predicted
                 predicted =  torch.argmax(F.softmax(y_pred, dim = 1), dim = 1)
                 # Sum the correct train of the current mini-batch
-                correct_train += ((predicted == Y.T[0]-1).sum().item()) / (predicted.shape[0])
+                correct_train += ((predicted == Y[:, -1] - 1).sum().item()) / (predicted.shape[0])
                 # Sum the loss of the current mini-batch
                 running_loss += loss.item()
 
@@ -416,13 +422,27 @@ class Conv2DNet(nn.Module):
         #* END FOR LOOP
         #*##############
 
-        # Plot training loss error
+        # Create training loss error plot to show the first epoch and the 
+        # rest of epochs on steps of 5.
+        fig_epoch_loss_acc, ax = plt.subplots(1,1)
+        plt.title('Train loss and accuracy')
+        plt.xlabel('epoch')
+        plt.plot(loss_train, 'r-', label = 'loss')
+        plt.plot(accuracy, 'g-', label = 'accuracy')
+        plt.legend()
+        plt.xticks(range(0, epochs+1, 5))
+
+        xt = ax.get_xticks()
+        xt = np.append(xt, 1)
+        ax.set_xticks(xt)
+
+        plt.xlim([1, epochs])
+
+        # Save figure to instance atribute
+        self.fig_epoch_loss_acc = fig_epoch_loss_acc
+        
+        # Evaluate if we want to show the plot
         if(plot):
-            plt.title('Train loss and accuracy')
-            plt.xlabel('epoch')
-            plt.plot(loss_train, 'r-', label = 'loss')
-            plt.plot(accuracy, 'g-', label = 'accuracy')
-            plt.legend()
             plt.show()
 
     def predict(self, batch_x):
