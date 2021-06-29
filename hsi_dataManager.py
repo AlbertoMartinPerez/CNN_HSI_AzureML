@@ -1837,7 +1837,7 @@ class CrossValidator:
                 Kn_OACC = mts.get_metrics(y_true_Kn, y_hat_Kn, self.numUniqueLabels)['OACC']
 
                 if (best_Kn_OACC < Kn_OACC):
-                    print('\t\t\t ** Found new best model in Kn=', Kn, 'iteration! **')
+                    print('\t\t\t ** Found new best model in Kn=', Kn+1, 'iteration! **')
                     best_Kn_OACC = Kn_OACC
 
                     # Save Kn CNN model in local variable
@@ -1866,7 +1866,7 @@ class CrossValidator:
             K_OACC = mts.get_metrics(y_true_K, y_hat_K, self.numUniqueLabels)['OACC']
 
             if (best_K_OACC < K_OACC):
-                print('\t\t ** Found new best model in K=', K, 'iteration! **')
+                print('\t\t ** Found new best model in K=', K+1, 'iteration! **')
                 best_K_OACC = K_OACC
 
                 # Save or update best CNN model obtained during double cross-validation
