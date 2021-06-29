@@ -6,6 +6,7 @@
 #*######################################################################################################
 
 import torch                        # Import PyTorch
+import matplotlib.pyplot as plt     # Import pyplots as plt
 
 import hsi_dataManager as hsi_dm    # Import 'hsi_dataManager.py' file as 'hsi_dm' to load use all desired functions 
 import nn_models as models          # Import 'nn_models.py' file as 'models' to define any new Neural Network included in the file 
@@ -82,7 +83,7 @@ if useAzure:
 
 else:
     # Desired patient images ID
-    patients_list_train = ['ID0030C02', 'ID0033C02', 'ID0035C02']
+    patients_list_train = ['ID0033C02']
     patient_test = ['ID0033C02']
 
     # Directories with data
@@ -98,7 +99,7 @@ else:
     batch_dim = '3D'
 
     # Number of epochs
-    epochs = 1
+    epochs = 20
 
     # Batch size
     batch_size = 16
@@ -301,6 +302,7 @@ if useAzure:
     run.log_image(name='Predicted GT classification map', plot=fig_predMap)
     run.log_image(name='Predicted and true GT classification maps', plot=fig_GTs)
     run.log_image(name='Predicted cube classification map', plot=fig_predCube)
+    run.log_image(name='Model loss and accuracy by epoch', plot=model.fig_epoch_loss_acc)
 
     # Save the trained model in the outputs folder
     os.makedirs('outputs', exist_ok=True)
