@@ -33,7 +33,6 @@ print("Loading arguments from the control Script run...")
 
 start = timer()
 
-
 # Get script arguments 
 # (file datasets mount points for gt maps and preprocessed cubes)
 parser = argparse.ArgumentParser()
@@ -68,6 +67,7 @@ end = timer()
 # Measure time elapsed parsing arguments
 time_load_args = (end - start)
 
+
 # Get the experiment run context
 run = Run.get_context()
 
@@ -80,6 +80,7 @@ run.log('Batch size',  batch_size)
 run.log('Patch size', patch_size)
 run.log('Number of K folds', k_folds)
 run.log('Learning rates', lr)
+
 
 # Start measuring loading training data
 start = timer()
@@ -107,7 +108,13 @@ print("\tTraining images have been loaded. Creating training batches...")
 # Create batches with the loaded data. Returns 'batches' which is a Python dictionary including 2 Python lists, 'data' and 'labels', containing all batches
 batches_train = cm_train.create_batches()
 
-print("\tTraining batches have been created.")
+print("\tTraining batches have been created. Converting batches to PyTorch tensors...")
+
+# Convert batches to PyTorch tensors to feed our CNN
+data_tensor_batch = cm_train.batch_to_tensor(batches_train['cube'], data_type = torch.float)
+labels_tensor_batch = cm_train.batch_to_tensor(batches_train['label'], data_type = torch.LongTensor)
+
+print("\tPyTorch tensors have been created.")
 
 end = timer()
 
@@ -123,14 +130,11 @@ print("Training your Neural Network. Please wait...")
 
 start = timer()
 
-# Create a CrossValidator instance
-cv = hsi_dm.CrossValidator(batch_data=batches_train['cube'], batch_labels=batches_train['label'], k_folds=k_folds, numUniqueLabels=cm_train.numUniqueLabels, numBands=cm_train.numBands, epochs=epochs, lr=lr)
+# Create a Conv2DNet model
+model = models.Conv2DNet(num_classes = cm_train.numUniqueLabels, in_channels = cm_train.numBands)
+print("\tConv2DNet model has been defined!")
 
-# Perform K-fold double-cross validation
-cv.double_cross_validation()
-
-# Save in 'model' the best model obtained from the double-cross validation
-model = cv.bestModel
+model.trainNet(batch_x = data_tensor_batch, batch_y = labels_tensor_batch, epochs = epochs, plot = False, lr = lr)
 
 end = timer()
 
@@ -186,7 +190,6 @@ end = timer()
 
 # Measure time elapsed loading and preparing batches and tensors for the PyTorch model
 time_predict_test_im = (end - start)
-
 
 #*##############################################
 #* COMPUTE METRICS WITH THE MODEL PREDICTION
