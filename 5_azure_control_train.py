@@ -11,34 +11,90 @@ use_registered_environment = True
 env_name = "PyTorch_Conv2DNet-experiment-env"
 
 # Experiment folder name
-experiment_folder = 'PyTorch_training_from_file_datasets'
-# Experiment name to deploy to Azure
-experiment_name = 'exp-4-PyTorch-train'
+experiment_folder = 'Azure_PyTorch_training'
+
+# Experiment number
+exp_number = '2'
 
 # Available personal Workspace Compute Clusters (you may have different ones):
 # CPU cluster = 'CPU-CompCluster'
 # GPU cluster = 'GPU-ComCluster'
 cluster_name = 'GPU-ComCluster'
 
+# Use double-cross validation when training CNN
+double_cv = True
+
+# Model architecture (True = CNN with 3D | False = CNN with 2D)
+conv_cnn_3D = False
+
 #*###################################
 #* Variables for the ScriptRunConfig
 #*
 
 # Desired patient images ID
-# ['ID0018C09', 'ID0025C02', 'ID0029C02', 'ID0030C02', 'ID0033C02', 'ID0034C02', 'ID0035C02', 'ID0038C02', 'ID0047C02', 'ID0047C08', 'ID0050C05', 'ID0051C05', 'ID0056C02',
+# They should be included in a single string with comas, so that we later split them to identify each patient
+# 'ID0018C09,ID0025C02,ID0029C02,ID0030C02,ID0033C02,ID0034C02,ID0035C02,ID0038C02,ID0047C02,ID0047C08,ID0050C05,ID0051C05,ID0056C02',
 # 'ID0064C04', 'ID0064C06', 'ID0065C01', 'ID0065C09', 'ID0067C01', 'ID0068C08', 'ID0070C02', 'ID0070C05', 'ID0070C08', 'ID0071C02', 'ID0071C011', 'ID0071C014']
 # Inside the input script for the ScripRunConfig, list variables are converted to Python lists
-patients_list_train = 'ID0030C02,ID0033C02,ID0035C02'
-patient_test = 'ID0033C02'
+patients_list_train = 'ID0018C09,ID0025C02,ID0029C02,ID0030C02,ID0033C02,ID0034C02,ID0035C02,ID0038C02,ID0047C02,ID0047C08,ID0050C05,ID0051C05'
+patient_test = 'ID0056C02'
 
-# Model name
-model_name = 'Conv2DNet_' + patient_test
+
+# If statements to determine the name of the models and the script to use as script run
+if double_cv:
+# Perform double-cross validation
+
+    if conv_cnn_3D:
+        # If passed, name the model with 3D and _CV sufix
+        model_name = 'Conv3DNet_' + patient_test + '_CV'
+
+        # todo: Change file name when using 3D CNN
+        # If passed, use the script run that performs the 5-fold double-cross validation on 3D CNN
+        scriptRunName = '.py'
+
+        # Experiment name to deploy to Azure
+        experiment_name = 'exp-'+ exp_number +'-PyTorch-3D-CNN-train_CV'
+
+    else:
+        # If passed, name the model with 2D and _CV sufix
+        model_name = 'Conv2DNet_' + patient_test + '_CV'
+
+        # If passed, use the script run that performs the 5-fold double-cross validation on 2D CNN
+        scriptRunName = 'azure_train_experiments.py'
+
+        # Experiment name to deploy to Azure
+        experiment_name = 'exp-'+ exp_number +'-PyTorch-2D-CNN-train_CV'
+
+else:
+# Do not perform double-cross validation
+
+    if conv_cnn_3D:
+        # If passed, name the model with 3D and _noCV sufix
+        model_name = 'Conv3DNet_' + patient_test + '_noCV'
+
+        # todo: Change file name when using 3D CNN 
+        # If passed, use the script run that trains a single 3D CNN with no cross-validation
+        scriptRunName = '.py'
+
+        # Experiment name to deploy to Azure
+        experiment_name = 'exp-'+ exp_number +'-PyTorch-3D-CNN-train_noCV'
+    
+    else:
+        # If passed, name the model with 2D and _noCV sufix
+        model_name = 'Conv2DNet_' + patient_test + '_noCV'
+
+        # If passed, use the script run that trains a single 2D CNN with no cross-validation
+        scriptRunName = 'azure_train_noCV_experiment.py'
+        
+        # Experiment name to deploy to Azure
+        experiment_name = 'exp-'+ exp_number +'-PyTorch-2D-CNN-train_noCV'
+
 
 # Determine dimension of batches for the Neural Network
 batch_dim = '3D'
 
 # Number of epochs
-epochs = 10
+epochs = 100
 
 # Batch size
 batch_size = 16
@@ -47,7 +103,7 @@ batch_size = 16
 patch_size = 7
 
 # K_folds
-k_folds = 2
+k_folds = 5
 
 # Learning rate
 lr = 0.001
@@ -89,7 +145,7 @@ os.makedirs(experiment_folder, exist_ok=True)
 print(experiment_folder, 'folder created')
 
 # Copy the necessary Python files into the experiment folder
-shutil.copy('./example_CubeManager.py', os.path.join(experiment_folder, "example_CubeManager.py"))
+shutil.copy('./'+scriptRunName, os.path.join(experiment_folder, scriptRunName))
 shutil.copy('./hsi_dataManager.py', os.path.join(experiment_folder, "hsi_dataManager.py"))
 shutil.copy('./metrics.py', os.path.join(experiment_folder, "metrics.py"))
 shutil.copy('./nn_models.py', os.path.join(experiment_folder, "nn_models.py"))
@@ -135,7 +191,7 @@ else:
 # a temporary location on the compute where the script is being run.
 # Reference to datasets and the paths where they will be downloaded in the environment
 script_config = ScriptRunConfig(source_directory=experiment_folder,
-                                script='example_CubeManager.py',
+                                script=scriptRunName,
                                 arguments = ['--gt-data', gt_ds.as_named_input('gtMaps_data').as_download(),
                                 '--preProcessed-data', preProcessed_ds.as_named_input('preProcessed_data').as_download(),
                                 '--patients_list_train', patients_list_train,
