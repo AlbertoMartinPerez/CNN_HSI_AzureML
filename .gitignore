@@ -5,6 +5,7 @@ scripts_guille/
 Azure_Machine_Learning_Notebooks/
 Azure_PyTorch_training/
 brain_classification_service/
+Results/
 temp.py
 config.json
 classificationMap.png

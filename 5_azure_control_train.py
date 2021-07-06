@@ -14,7 +14,7 @@ env_name = "PyTorch_Conv2DNet-experiment-env"
 experiment_folder = 'Azure_PyTorch_training'
 
 # Experiment number
-exp_number = '2'
+exp_number = '3'
 
 # Available personal Workspace Compute Clusters (you may have different ones):
 # CPU cluster = 'CPU-CompCluster'
@@ -22,7 +22,7 @@ exp_number = '2'
 cluster_name = 'GPU-ComCluster'
 
 # Use double-cross validation when training CNN
-double_cv = True
+double_cv = False
 
 # Model architecture (True = CNN with 3D | False = CNN with 2D)
 conv_cnn_3D = False
@@ -33,11 +33,10 @@ conv_cnn_3D = False
 
 # Desired patient images ID
 # They should be included in a single string with comas, so that we later split them to identify each patient
-# 'ID0018C09,ID0025C02,ID0029C02,ID0030C02,ID0033C02,ID0034C02,ID0035C02,ID0038C02,ID0047C02,ID0047C08,ID0050C05,ID0051C05,ID0056C02',
-# 'ID0064C04', 'ID0064C06', 'ID0065C01', 'ID0065C09', 'ID0067C01', 'ID0068C08', 'ID0070C02', 'ID0070C05', 'ID0070C08', 'ID0071C02', 'ID0071C011', 'ID0071C014']
-# Inside the input script for the ScripRunConfig, list variables are converted to Python lists
-patients_list_train = 'ID0018C09,ID0025C02,ID0029C02,ID0030C02,ID0033C02,ID0034C02,ID0035C02,ID0038C02,ID0047C02,ID0047C08,ID0050C05,ID0051C05'
-patient_test = 'ID0056C02'
+# 'ID0018C09,ID0025C02,ID0029C02,ID0030C02,ID0033C02,ID0034C02,ID0035C02,ID0038C02,ID0047C02,ID0047C08,ID0050C05,ID0051C05,ID0056C02'
+# Inside the input script for the ScripRunConfig, string is splitted to obtained all patients used for training.
+patients_list_train = 'ID0047C02,ID0047C08,ID0050C05'
+patient_test = 'ID0051C05'
 
 
 # If statements to determine the name of the models and the script to use as script run
