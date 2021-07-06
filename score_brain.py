@@ -1,16 +1,16 @@
 import json
 from json import JSONEncoder
-import io
 
 import joblib
 import torch
 import numpy as np
-from PIL import Image
 
 from azureml.core.model import Model
 
 import hsi_dataManager as hsi_dm    # Import 'hsi_dataManager.py' file as 'hsi_dm' to load use all desired functions 
 import metrics as mts               # Import 'metrics.py' file as 'mts' to evluate metrics
+
+from timeit import default_timer as timer       # Import timeit to measure times in the script
 
 #*########################
 #* AZURE SERVICE ACTIONS
@@ -20,11 +20,13 @@ import metrics as mts               # Import 'metrics.py' file as 'mts' to evlua
 def init():
     global model
     # Get the path to the deployed model file and load it
-    model_path = Model.get_model_path('Conv2DNet_ID0033C02')
+    model_path = Model.get_model_path('Conv2DNet_ID0056C02_CV', version=1)
     model = joblib.load(model_path)
 
 # Called when a request is received
 def run(json_object):
+
+    start = timer()
 
     # Deserialization
     dictionary = json.loads(json_object)
@@ -36,11 +38,25 @@ def run(json_object):
     batch_size = dictionary['batch_size']
     patient_id = dictionary['patient_id']
 
+    end = timer()
+    # Measure time elapsed parsing arguments
+    time_parsing_data = (end - start)
+
+
+    start = timer()
+
     # Create an instance of 'RawManager'
     rawManager = hsi_dm.RawManager(raw_image, white_ref, black_ref, patch_size = patch_size, batch_size = batch_size)
 
     # Preprocess input image
     rawManager.preProcessImage()
+
+    end = timer()
+    # Measure time elapsed preprocessing cube
+    time_preProcessing_data = (end - start)
+
+
+    start = timer()
 
     # Extract dimension of the loaded preProcessed cube with added padding for the input image
     dims = rawManager.pad_processedCube.shape
@@ -54,6 +70,13 @@ def run(json_object):
     # Obtain 'cube' batches coordenates
     cube_coordenates = rawManager.concatenate_list_to_numpy(cube_batch['coords']).astype(int)
 
+    end = timer()
+    # Measure time elapsed preparing pre-processed image to PyTorch tensors and batches
+    time_preparing_batches = (end - start)
+
+
+    start = timer()
+
     # Predict with the hosted model in the Webservice
     pred_labels = model.predict(batch_x = cube_tensor_batch)
 
@@ -64,8 +87,13 @@ def run(json_object):
     # Convert a Matplotlib figure to a PIL Image, then cast to Numpy array
     classification_map = fig2numpy(fig_predCube)
 
+    end = timer()
+    # Measure time elapsed parsing arguments
+    time_predict_cMap = (end - start)
+
     # Return serialized classification map PIL image to bytearray using hexadecimal encoding
-    return json.dumps({'classification_map': classification_map}, cls=NumpyArrayEncoder)
+    return json.dumps({'classification_map': classification_map, 'time_parsing_data': time_parsing_data, 'time_preProcessing_data': time_preProcessing_data,
+                        'time_preparing_batches': time_preparing_batches, 'time_predict_cMap': time_predict_cMap}, cls=NumpyArrayEncoder)
     
 
 #*
