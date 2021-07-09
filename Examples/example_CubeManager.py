@@ -1,4 +1,3 @@
-
 #*#####################################################################################################
 #* DESCRIPTION OF THIS SCRIPT:
 #* Basic script to learn how to use the 'CubeManager' class from 'hsi_dataManager.py' file with Azure
@@ -8,9 +7,9 @@
 import torch                        # Import PyTorch
 import matplotlib.pyplot as plt     # Import pyplots as plt
 
-import hsi_dataManager as hsi_dm    # Import 'hsi_dataManager.py' file as 'hsi_dm' to load use all desired functions 
-import nn_models as models          # Import 'nn_models.py' file as 'models' to define any new Neural Network included in the file 
-import metrics as mts               # Import 'metrics.py' file as 'mts' to evluate metrics
+from ..Libraries import hsi_dataManager as hsi_dm    # Import 'hsi_dataManager.py' file as 'hsi_dm' to load use all desired functions 
+from ..Libraries import nn_models as models          # Import 'nn_models.py' file as 'models' to define any new Neural Network included in the file 
+from ..Libraries import metrics as mts               # Import 'metrics.py' file as 'mts' to evluate metrics
 
 # Import Azure SKD for Python packages
 from azureml.core import Run

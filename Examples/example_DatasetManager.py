@@ -15,9 +15,9 @@
 
 import torch                        # Import PyTorch
 
-import hsi_dataManager as hsi_dm    # Import 'hsi_dataManager.py' file as 'hsi_dm' to load use all desired functions 
-import nn_models as models          # Import 'nn_models.py' file as 'models' to define any new Neural Network included in the file 
-import metrics as mts               # Import 'metrics.py' file as 'mts' to evluate metrics
+from ..Libraries import hsi_dataManager as hsi_dm    # Import 'hsi_dataManager.py' file as 'hsi_dm' to load use all desired functions 
+from ..Libraries import nn_models as models          # Import 'nn_models.py' file as 'models' to define any new Neural Network included in the file 
+from ..Libraries import metrics as mts               # Import 'metrics.py' file as 'mts' to evluate metrics
 
 #*#############################
 #*#### START MAIN PROGRAM #####

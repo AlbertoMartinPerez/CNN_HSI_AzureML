@@ -145,10 +145,10 @@ print(experiment_folder, 'folder created')
 
 # Copy the necessary Python files into the experiment folder
 shutil.copy('./'+scriptRunName, os.path.join(experiment_folder, scriptRunName))
-shutil.copy('./hsi_dataManager.py', os.path.join(experiment_folder, "hsi_dataManager.py"))
-shutil.copy('./metrics.py', os.path.join(experiment_folder, "metrics.py"))
-shutil.copy('./nn_models.py', os.path.join(experiment_folder, "nn_models.py"))
-shutil.copy('./preProcessing_chain.py', os.path.join(experiment_folder, "preProcessing_chain.py"))
+shutil.copy('./Libraries/hsi_dataManager.py', os.path.join(experiment_folder, "hsi_dataManager.py"))
+shutil.copy('./Libraries/metrics.py', os.path.join(experiment_folder, "metrics.py"))
+shutil.copy('./Libraries/nn_models.py', os.path.join(experiment_folder, "nn_models.py"))
+shutil.copy('./Libraries/preProcessing_chain.py', os.path.join(experiment_folder, "preProcessing_chain.py"))
 
 #*###############################
 #* DEFINE AN ENVIRONMENT OR 
