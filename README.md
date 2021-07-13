@@ -1,4 +1,4 @@
-# Convolutional Neural Network model deployment using Azure Machine Learning for intraoperative brain tumor classification
+# Convolutional Neural Network model deployment using Azure Machine Learning and Docker for intraoperative brain tumor classification
 Final master thesis code and results for the [**Master of Science in Internet of Things**](http://masteriot.etsist.upm.es/) taught by [**Universidad Politécnica de Madrid**](https://www.upm.es/) (2020/21).
 Developed by **Alberto Martín Pérez** in colaboration with **GDEM** research group and the [NEMESIS-3D-CM](http://nemesis3d.citsem.upm.es/) project.
 
